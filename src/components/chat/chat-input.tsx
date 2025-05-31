@@ -1,12 +1,13 @@
+
 "use client";
 
-import { useState, useRef, KeyboardEvent } from "react";
+import { useState, useRef, KeyboardEvent, ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Paperclip, SendHorizonal, Smile } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { SmartReplyButton } from "./smart-reply-button";
 import { Skeleton } from "../ui/skeleton";
+import { useToast } from "@/hooks/use-toast"; // Added for toast messages
 
 interface ChatInputProps {
   onSendMessage: (text: string) => void;
@@ -17,6 +18,8 @@ interface ChatInputProps {
 export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null); // Ref for file input
+  const { toast } = useToast(); // Hook for toast messages
 
   const handleSend = () => {
     if (message.trim()) {
@@ -37,6 +40,34 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
     }
   };
 
+  const handleAttachmentClick = () => {
+    fileInputRef.current?.click(); // Trigger hidden file input
+  };
+
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      toast({
+        title: "File Selected",
+        description: `"${file.name}" ready to be attached (feature in progress).`,
+      });
+      // Reset file input to allow selecting the same file again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      // In a real app, you'd handle the file upload here
+      // For now, we just show a toast. You might want to send a message like:
+      // onSendMessage(`Attached: ${file.name}`);
+    }
+  };
+
+  const handleEmojiClick = () => {
+    toast({
+      title: "Emoji Picker",
+      description: "Emoji picker is coming soon!",
+    });
+  };
+
   return (
     <div className="border-t bg-card p-3 md:p-4">
       { (isLoadingSmartReplies || smartReplies.length > 0) && (
@@ -55,11 +86,17 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
         </div>
       )}
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="shrink-0">
+        <Button variant="ghost" size="icon" className="shrink-0" onClick={handleAttachmentClick}>
           <Paperclip className="h-5 w-5" />
           <span className="sr-only">Attach file</span>
         </Button>
-        <Button variant="ghost" size="icon" className="shrink-0">
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          onChange={handleFileChange} 
+          className="hidden" 
+        />
+        <Button variant="ghost" size="icon" className="shrink-0" onClick={handleEmojiClick}>
           <Smile className="h-5 w-5" />
           <span className="sr-only">Add emoji</span>
         </Button>
