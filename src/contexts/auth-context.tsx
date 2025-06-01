@@ -20,9 +20,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('rippleChatUser');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
+    const storedUserJson = localStorage.getItem('rippleChatUser');
+    if (storedUserJson) {
+      try {
+        const storedUser = JSON.parse(storedUserJson) as User;
+        // Validate if storedUser is still a recognizable user from mockUsers
+        const isValidMockUser = mockUsers.some(u => u.id === storedUser.id && u.email === storedUser.email);
+        if (isValidMockUser) {
+          setUser(storedUser);
+        } else {
+          // Stored user is outdated or invalid, clear it
+          localStorage.removeItem('rippleChatUser');
+          setUser(null); // Treat as logged out
+        }
+      } catch (error) {
+        // Problem parsing stored user, clear it
+        localStorage.removeItem('rippleChatUser');
+        setUser(null);
+      }
     }
     setLoading(false);
   }, []);
@@ -37,7 +52,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     } else {
       setLoading(false);
-      // Throw an error if user is not found, instead of defaulting
       throw new Error("User not found or invalid credentials. Please sign up or try a different email.");
     }
   };
