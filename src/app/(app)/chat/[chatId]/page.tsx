@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useRef } from 'react';
@@ -132,7 +133,7 @@ export default function ChatConversationPage() {
         name={chatName || "Chat"} 
         avatarUrl={chatAvatar} 
         status={chatStatus || (chat.isGroup ? 'group' : 'offline')}
-        participantCount={chat.participants.length}
+        participants={chat.participants}
         isGroup={!!chat.isGroup}
       />
       <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
