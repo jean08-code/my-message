@@ -1,3 +1,4 @@
+
 export type UserStatus = 'online' | 'offline' | 'away' | 'dnd'; // dnd = Do Not Disturb
 
 export interface User {
@@ -8,6 +9,8 @@ export interface User {
   status: UserStatus;
 }
 
+export type MessageStatus = 'sent' | 'delivered' | 'read';
+
 export interface Message {
   id: string;
   chatId: string;
@@ -15,6 +18,7 @@ export interface Message {
   text: string;
   timestamp: number; // Use number (timestamp) for easier sorting and consistent Date handling
   isOwn?: boolean; // UI helper, set on client
+  status?: MessageStatus; // For sent, delivered, read status
 }
 
 export interface Chat {

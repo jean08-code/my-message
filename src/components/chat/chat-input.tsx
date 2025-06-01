@@ -9,6 +9,7 @@ import { SmartReplyButton } from "./smart-reply-button";
 import { Skeleton } from "../ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 interface ChatInputProps {
@@ -16,6 +17,8 @@ interface ChatInputProps {
   smartReplies: string[];
   isLoadingSmartReplies: boolean;
 }
+
+const emojis = ["😀", "😂", "😍", "🤔", "👍", "🎉", "❤️", "🙏"];
 
 export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }: ChatInputProps) {
   const [message, setMessage] = useState("");
@@ -27,6 +30,7 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
   const [micPermission, setMicPermission] = useState<'idle' | 'pending' | 'granted' | 'denied'>('idle');
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   const [showMicPermissionAlert, setShowMicPermissionAlert] = useState(false);
+  const [isEmojiPopoverOpen, setIsEmojiPopoverOpen] = useState(false);
 
   const handleSend = () => {
     if (message.trim()) {
@@ -61,16 +65,15 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
         description: `${file.name} (${fileSizeKB} KB) was sent as a message.`,
       });
       if (fileInputRef.current) {
-        fileInputRef.current.value = "";
+        fileInputRef.current.value = ""; // Reset file input
       }
     }
   };
 
-  const handleEmojiClick = () => {
-    toast({
-      title: "Emoji Picker",
-      description: "Emoji picker is coming soon!",
-    });
+  const handleEmojiSelect = (emoji: string) => {
+    setMessage(prevMessage => prevMessage + emoji);
+    setIsEmojiPopoverOpen(false);
+    textareaRef.current?.focus();
   };
 
   const handleVoiceNoteClick = async () => {
@@ -104,12 +107,6 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
         console.error('Error accessing microphone:', error);
         setMicPermission('denied');
         setShowMicPermissionAlert(true);
-        // Toast is also shown in the Alert now.
-        // toast({
-        //   variant: 'destructive',
-        //   title: 'Microphone Access Denied',
-        //   description: 'Please enable microphone permissions in your browser settings.',
-        // });
       }
     }
   };
@@ -161,10 +158,30 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
           className="hidden" 
           disabled={isRecording}
         />
-        <Button variant="ghost" size="icon" className="shrink-0" onClick={handleEmojiClick} disabled={isRecording}>
-          <Smile className="h-5 w-5" />
-          <span className="sr-only">Add emoji</span>
-        </Button>
+        
+        <Popover open={isEmojiPopoverOpen} onOpenChange={setIsEmojiPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="icon" className="shrink-0" disabled={isRecording}>
+              <Smile className="h-5 w-5" />
+              <span className="sr-only">Add emoji</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-2">
+            <div className="grid grid-cols-4 gap-1">
+              {emojis.map(emoji => (
+                <Button 
+                  key={emoji} 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => handleEmojiSelect(emoji)}
+                  className="text-xl"
+                >
+                  {emoji}
+                </Button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
         
         <div className="flex-1 flex items-end relative">
           <Textarea
@@ -180,17 +197,20 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
             rows={1}
             disabled={isRecording}
           />
-          {isRecording && (
+          {isRecording && micPermission === 'granted' && (
              <span className="absolute right-3 bottom-2.5 text-xs text-primary animate-pulse">REC</span>
+          )}
+           {isRecording && micPermission === 'pending' && (
+             <span className="absolute right-3 bottom-2.5 text-xs text-muted-foreground animate-pulse">...</span>
           )}
         </div>
 
         <Button 
-          onClick={isRecording ? handleVoiceNoteClick : handleSend} 
+          onClick={message.trim() && !isRecording ? handleSend : handleVoiceNoteClick} 
           size="icon" 
           className={cn(
-            "shrink-0 rounded-full bg-accent hover:bg-accent/90",
-            isRecording && "bg-red-500 hover:bg-red-600"
+            "shrink-0 rounded-full",
+            isRecording ? "bg-red-500 hover:bg-red-600" : "bg-primary hover:bg-primary/90"
           )}
           aria-label={isRecording ? "Stop recording" : (message.trim() ? "Send message" : "Record voice note")}
         >
@@ -202,20 +222,6 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
             <Mic className="h-5 w-5" />
           )}
         </Button>
-        
-        {/* Fallback voice note button if primary button is for sending text */}
-        {/* This logic is now integrated into the main send button */}
-        {/* {!message.trim() && !isRecording && (
-          <Button onClick={handleVoiceNoteClick} size="icon" className="shrink-0 rounded-full bg-primary hover:bg-primary/90" aria-label="Record voice note">
-            <Mic className="h-5 w-5" />
-          </Button>
-        )}
-        {isRecording && (
-           <Button onClick={handleVoiceNoteClick} size="icon" className="shrink-0 rounded-full bg-red-500 hover:bg-red-600" aria-label="Stop recording">
-            <StopCircle className="h-5 w-5" />
-          </Button>
-        )} */}
-
       </div>
     </div>
   );
