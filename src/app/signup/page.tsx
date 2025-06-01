@@ -26,10 +26,20 @@ export default function SignupPage() {
     setIsLoading(true);
     try {
       await signup(name, email, password);
-      // Redirect after signup is handled by AuthProvider's onAuthStateChanged or effect in AppLayout
       router.push('/chat');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to sign up');
+    } catch (err: any) {
+      if (err.code === 'auth/api-key-not-valid') {
+        setError('Firebase API Key is not valid. Please ensure `src/lib/firebase.ts` has your correct Firebase project configuration.');
+      } else if (err.code === 'auth/email-already-in-use') {
+        setError('This email address is already in use. Please try a different email or log in.');
+      } else if (err.code === 'auth/weak-password') {
+        setError('The password is too weak. Please use a stronger password (at least 6 characters).');
+      } else if (err instanceof Error) {
+        setError(err.message || 'Failed to sign up. Please try again.');
+      } else {
+        setError('An unexpected error occurred during sign up. Please try again.');
+      }
+      console.error("Signup page error:", err);
     } finally {
       setIsLoading(false);
     }

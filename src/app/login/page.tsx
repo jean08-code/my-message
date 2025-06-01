@@ -26,11 +26,19 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await login(email, password);
-      // Redirect after login is handled by AuthProvider's onAuthStateChanged or effect in AppLayout
       const redirectPath = searchParams.get('redirect') || '/chat';
       router.push(redirectPath);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to login');
+    } catch (err: any) {
+      if (err.code === 'auth/api-key-not-valid') {
+        setError('Firebase API Key is not valid. Please ensure `src/lib/firebase.ts` has your correct Firebase project configuration.');
+      } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+        setError('Invalid email or password. Please try again.');
+      } else if (err instanceof Error) {
+        setError(err.message || 'Failed to login. Please try again.');
+      } else {
+        setError('An unexpected error occurred during login. Please try again.');
+      }
+      console.error("Login page error:", err);
     } finally {
       setIsLoading(false);
     }
