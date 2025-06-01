@@ -1,35 +1,32 @@
 
-export type UserStatus = 'online' | 'offline' | 'away' | 'dnd'; // dnd = Do Not Disturb
-
+// User interface, aligning more with Firebase Auth user object
 export interface User {
-  id: string;
-  name: string;
-  email?: string;
-  avatarUrl?: string;
-  status: UserStatus;
+  uid: string; // Firebase User ID
+  displayName: string | null;
+  email: string | null;
+  photoURL?: string | null;
+  // UserStatus (online/offline) is removed for simplicity with Firebase basic setup
 }
 
-export type MessageStatus = 'sent' | 'delivered' | 'read';
-
+// Message interface for Firestore
 export interface Message {
-  id: string;
+  id: string; // Document ID from Firestore
   chatId: string;
-  senderId: string;
+  senderId: string; // Firebase UID of the sender
+  senderName?: string | null; // displayName of the sender, denormalized for convenience
   text: string;
-  timestamp: number; // Use number (timestamp) for easier sorting and consistent Date handling
-  isOwn?: boolean; // UI helper, set on client
-  status?: MessageStatus; // For sent, delivered, read status
+  timestamp: number; // Firestore serverTimestamp will be used, but number for client-side sorting
+  // isOwn is a client-side helper, will be determined by comparing senderId with current user's UID
+  // MessageStatus (sent/delivered/read) is removed for simplicity
 }
 
+// Chat interface - this will evolve as we integrate ChatList with Firestore
 export interface Chat {
-  id: string;
-  participants: User[];
-  messages: Message[];
-  lastMessage?: Message;
-  unreadCount?: number;
-  name?: string; // For group chats, or participant names for 1:1
-  isGroup?: boolean;
-  typingUserIds?: string[]; // IDs of users currently typing
+  id:string; // Document ID from Firestore (e.g., 'general', or an auto-generated ID)
+  // Participants might be an array of UIDs or a map
+  // For now, we are focusing on individual chat rooms like 'general'
+  name?: string; // Name of the chat room
+  // lastMessage, unreadCount etc. will be added when ChatList is built
 }
 
 export interface NotificationSettings {

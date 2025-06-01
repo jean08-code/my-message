@@ -4,8 +4,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { PresenceIndicator } from "./presence-indicator";
-import type { User, UserStatus } from "@/lib/types";
+// PresenceIndicator is removed as user status feature is simplified/removed
+// import { PresenceIndicator } from "./presence-indicator";
+import type { User } from "@/lib/types"; // Using AppUser type
 import { ArrowLeft, Info, Phone, Video, X, Mic, Users, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
@@ -21,19 +22,21 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
+import { useAuth } from '@/contexts/auth-context'; 
 
 interface ChatHeaderProps {
   chatId: string;
   name: string;
-  avatarUrl?: string;
-  status: UserStatus | 'group' | string; 
-  participants: User[];
+  avatarUrl?: string | null;
+  status: 'group' | 'online' | 'offline' | string; // Status simplified
+  participants: User[]; // Expects AppUser[]
   isGroup: boolean;
 }
 
 export function ChatHeader({ name, avatarUrl, status, participants, isGroup }: ChatHeaderProps) {
   const fallbackName = name ? name.substring(0, 2).toUpperCase() : "??";
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
 
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [videoPermissionStatus, setVideoPermissionStatus] = useState<'pending' | 'granted' | 'denied' | 'idle'>('idle');
@@ -45,23 +48,15 @@ export function ChatHeader({ name, avatarUrl, status, participants, isGroup }: C
   const [activeAudioStream, setActiveAudioStream] = useState<MediaStream | null>(null);
 
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
-  const { user: currentUser } = useAuth(); // For filtering self in participant list
-
+  
   const participantCount = participants.length;
 
   // Video Call Logic
-  const handleVideoCallClick = () => {
-    setIsVideoModalOpen(true);
-  };
-
+  const handleVideoCallClick = () => setIsVideoModalOpen(true);
   const handleCloseVideoCall = () => {
-    if (activeVideoStream) {
-      activeVideoStream.getTracks().forEach(track => track.stop());
-      setActiveVideoStream(null);
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
+    if (activeVideoStream) activeVideoStream.getTracks().forEach(track => track.stop());
+    setActiveVideoStream(null);
+    if (videoRef.current) videoRef.current.srcObject = null;
     setIsVideoModalOpen(false);
     setVideoPermissionStatus('idle'); 
   };
@@ -74,48 +69,25 @@ export function ChatHeader({ name, avatarUrl, status, participants, isGroup }: C
           const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
           setActiveVideoStream(stream);
           setVideoPermissionStatus('granted');
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-          }
+          if (videoRef.current) videoRef.current.srcObject = stream;
         } catch (err) {
-          console.error("Error accessing video/audio devices.", err);
           setVideoPermissionStatus('denied');
-          toast({
-            variant: "destructive",
-            title: "Media Access Denied",
-            description: "Please enable camera and microphone permissions for video calls.",
-          });
+          toast({ variant: "destructive", title: "Media Access Denied", description: "Enable camera/mic permissions." });
         }
       };
       getMedia();
-    } else {
-      if (activeVideoStream) {
-        activeVideoStream.getTracks().forEach(track => track.stop());
-        setActiveVideoStream(null);
-      }
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
     }
     return () => {
-      if (activeVideoStream) {
-        activeVideoStream.getTracks().forEach(track => track.stop());
-        setActiveVideoStream(null);
-      }
+      if (activeVideoStream) activeVideoStream.getTracks().forEach(track => track.stop());
     };
-  }, [isVideoModalOpen, toast]);
+  }, [isVideoModalOpen, toast, activeVideoStream]);
 
 
   // Audio Call Logic
-  const handleAudioCallClick = () => {
-    setIsAudioModalOpen(true);
-  };
-
+  const handleAudioCallClick = () => setIsAudioModalOpen(true);
   const handleCloseAudioCall = () => {
-    if (activeAudioStream) {
-      activeAudioStream.getTracks().forEach(track => track.stop());
-      setActiveAudioStream(null);
-    }
+    if (activeAudioStream) activeAudioStream.getTracks().forEach(track => track.stop());
+    setActiveAudioStream(null);
     setIsAudioModalOpen(false);
     setAudioPermissionStatus('idle');
   };
@@ -129,37 +101,22 @@ export function ChatHeader({ name, avatarUrl, status, participants, isGroup }: C
           setActiveAudioStream(stream);
           setAudioPermissionStatus('granted');
         } catch (err) {
-          console.error("Error accessing audio device.", err);
           setAudioPermissionStatus('denied');
-           toast({
-            variant: "destructive",
-            title: "Microphone Access Denied",
-            description: "Please enable microphone permissions for audio calls.",
-          });
+           toast({ variant: "destructive", title: "Mic Access Denied", description: "Enable mic permissions." });
         }
       };
       getAudio();
-    } else {
-       if (activeAudioStream) {
-        activeAudioStream.getTracks().forEach(track => track.stop());
-        setActiveAudioStream(null);
-      }
     }
      return () => {
-      if (activeAudioStream) {
-        activeAudioStream.getTracks().forEach(track => track.stop());
-        setActiveAudioStream(null);
-      }
+      if (activeAudioStream) activeAudioStream.getTracks().forEach(track => track.stop());
     };
-  }, [isAudioModalOpen, toast]);
+  }, [isAudioModalOpen, toast, activeAudioStream]);
 
   // Chat Info Logic
-  const handleChatInfoClick = () => {
-    setIsInfoModalOpen(true);
-  };
+  const handleChatInfoClick = () => setIsInfoModalOpen(true);
   
-  const actualParticipants = isGroup ? participants : participants.filter(p => p.id !== currentUser?.id);
-
+  const actualParticipants = isGroup ? participants : participants.filter(p => p.uid !== currentUser?.uid);
+  const displayAvatarUrl = avatarUrl || (isGroup ? `https://placehold.co/100x100.png?text=${fallbackName}` : `https://placehold.co/100x100.png?text=${fallbackName}`);
 
   return (
     <>
@@ -172,17 +129,15 @@ export function ChatHeader({ name, avatarUrl, status, participants, isGroup }: C
           </Link>
           <div className="relative">
             <Avatar className="h-10 w-10 border">
-              <AvatarImage src={avatarUrl} alt={name} data-ai-hint="user avatar group" />
+              <AvatarImage src={displayAvatarUrl} alt={name} data-ai-hint="user avatar group"/>
               <AvatarFallback>{fallbackName}</AvatarFallback>
             </Avatar>
-            {!isGroup && status !== 'group' && (
-               <PresenceIndicator status={status as UserStatus} className="absolute bottom-0 right-0" />
-            )}
+            {/* PresenceIndicator removed for simplicity */}
           </div>
           <div>
             <h2 className="text-base font-semibold text-foreground">{name}</h2>
             <p className="text-xs text-muted-foreground">
-              {isGroup ? `${participantCount} members` : status.charAt(0).toUpperCase() + status.slice(1)}
+              {isGroup ? `${participantCount} members` : status /* Simplified status display */}
             </p>
           </div>
         </div>
@@ -204,82 +159,28 @@ export function ChatHeader({ name, avatarUrl, status, participants, isGroup }: C
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Video Call Preview</DialogTitle>
-            <DialogDescription>Your camera and microphone are being accessed for the call.</DialogDescription>
+            <DialogDescription>Camera and microphone access for call.</DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
-            {videoPermissionStatus === 'pending' && (
-              <div className="flex flex-col items-center justify-center h-40">
-                <Mic className="h-8 w-8 animate-pulse text-primary mb-2" />
-                <p className="text-muted-foreground">Requesting camera and microphone access...</p>
-              </div>
-            )}
-            {videoPermissionStatus === 'denied' && (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Media Access Required</AlertTitle>
-                <AlertDescription>
-                  Please allow camera and microphone access in your browser settings to use this feature.
-                </AlertDescription>
-              </Alert>
-            )}
-             <video
-              ref={videoRef}
-              autoPlay
-              muted
-              playsInline
-              className={cn("w-full aspect-video rounded-md bg-muted", {
-                'hidden': videoPermissionStatus !== 'granted',
-              })}
-            />
-            {videoPermissionStatus === 'granted' && (
-                <p className="text-sm text-center text-green-600">Video preview active. Call functionality is mocked.</p>
-            )}
+            {videoPermissionStatus === 'pending' && <p className="text-muted-foreground text-center">Requesting media access...</p>}
+            {videoPermissionStatus === 'denied' && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Media Access Denied</AlertTitle></Alert>}
+            <video ref={videoRef} autoPlay muted playsInline className={cn("w-full aspect-video rounded-md bg-muted", {'hidden': videoPermissionStatus !== 'granted'})} />
+            {videoPermissionStatus === 'granted' && <p className="text-sm text-center text-green-600">Video preview active. Call (mocked).</p>}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={handleCloseVideoCall}>
-              <X className="mr-2 h-4 w-4" />
-              End Call (Preview)
-            </Button>
-          </DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={handleCloseVideoCall}><X className="mr-2 h-4 w-4" />End Call</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Audio Call Dialog */}
       <Dialog open={isAudioModalOpen} onOpenChange={(isOpen) => { if (!isOpen) handleCloseAudioCall(); else setIsAudioModalOpen(true);}}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Audio Call</DialogTitle>
-            <DialogDescription>Attempting to start an audio call.</DialogDescription>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Audio Call</DialogTitle><DialogDescription>Attempting audio call.</DialogDescription></DialogHeader>
           <div className="py-6 flex flex-col items-center justify-center space-y-3">
-            {audioPermissionStatus === 'pending' && (
-              <>
-                <Mic className="h-10 w-10 animate-pulse text-primary" />
-                <p className="text-muted-foreground">Requesting microphone access...</p>
-              </>
-            )}
-            {audioPermissionStatus === 'granted' && (
-              <>
-                <Mic className="h-10 w-10 text-green-500" />
-                <p className="text-green-600">Microphone connected. Audio call active (mock).</p>
-              </>
-            )}
-            {audioPermissionStatus === 'denied' && (
-               <Alert variant="destructive" className="w-full">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Microphone Access Denied</AlertTitle>
-                <AlertDescription>
-                  Please enable microphone permissions in your browser settings.
-                </AlertDescription>
-              </Alert>
-            )}
+            {audioPermissionStatus === 'pending' && <><Mic className="h-10 w-10 animate-pulse text-primary" /><p>Requesting mic access...</p></>}
+            {audioPermissionStatus === 'granted' && <><Mic className="h-10 w-10 text-green-500" /><p>Mic connected. Audio call (mock).</p></>}
+            {audioPermissionStatus === 'denied' && <Alert variant="destructive" className="w-full"><AlertTriangle className="h-4 w-4" /><AlertTitle>Mic Access Denied</AlertTitle></Alert>}
           </div>
-          <DialogFooter>
-             <Button variant="outline" onClick={handleCloseAudioCall}>
-              <X className="mr-2 h-4 w-4" />
-              End Call
-            </Button>
-          </DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={handleCloseAudioCall}><X className="mr-2 h-4 w-4" />End Call</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -287,58 +188,34 @@ export function ChatHeader({ name, avatarUrl, status, participants, isGroup }: C
       <Dialog open={isInfoModalOpen} onOpenChange={setIsInfoModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Info className="h-5 w-5 text-primary" />
-              Chat Information
-            </DialogTitle>
-            <DialogDescription>Details about {isGroup ? "this group chat" : `your chat with ${name}`}.</DialogDescription>
+            <DialogTitle className="flex items-center gap-2"><Info className="h-5 w-5 text-primary" />Chat Information</DialogTitle>
+            <DialogDescription>Details about {isGroup ? "this group" : `chat with ${name}`}.</DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                {isGroup ? "Group Name" : "Chatting With"}
-              </h3>
-              <p className="text-lg font-semibold">{name}</p>
-            </div>
+            <div><h3 className="text-sm font-medium text-muted-foreground mb-1">{isGroup ? "Group Name" : "Chatting With"}</h3><p className="text-lg font-semibold">{name}</p></div>
              {isGroup && (
               <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-2">
-                  <Users className="inline h-4 w-4 mr-1.5" />
-                  Participants ({participantCount})
-                </h3>
+                <h3 className="text-sm font-medium text-muted-foreground mb-2"><Users className="inline h-4 w-4 mr-1.5" />Participants ({participantCount})</h3>
                 <ScrollArea className="h-[150px] rounded-md border p-2">
                   <ul className="space-y-2">
                     {participants.map(p => (
-                      <li key={p.id} className="flex items-center gap-2 text-sm">
+                      <li key={p.uid} className="flex items-center gap-2 text-sm">
                         <Avatar className="h-7 w-7 border text-xs">
-                          <AvatarImage src={p.avatarUrl} alt={p.name} data-ai-hint="user avatar small" />
-                          <AvatarFallback>{p.name.substring(0,1)}</AvatarFallback>
+                          <AvatarImage src={p.photoURL || `https://placehold.co/100x100.png?text=${p.displayName?.substring(0,1)}`} alt={p.displayName || "User"} data-ai-hint="user avatar small"/>
+                          <AvatarFallback>{p.displayName ? p.displayName.substring(0,1) : "U"}</AvatarFallback>
                         </Avatar>
-                        <span>{p.name} {p.id === currentUser?.id ? "(You)" : ""}</span>
+                        <span>{p.displayName || "User"} {p.uid === currentUser?.uid ? "(You)" : ""}</span>
                       </li>
                     ))}
                   </ul>
                 </ScrollArea>
               </div>
             )}
-            {!isGroup && actualParticipants.length > 0 && (
-                 <div>
-                    <h3 className="text-sm font-medium text-muted-foreground mb-1">Participant Status</h3>
-                    <p className="text-sm">{actualParticipants[0].status.charAt(0).toUpperCase() + actualParticipants[0].status.slice(1)}</p>
-                 </div>
-            )}
-            {/* Add more info like shared media, etc. later */}
+            {/* Simplified: Removed status display for non-group chats as user status is complex now */}
           </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">Close</Button>
-            </DialogClose>
-          </DialogFooter>
+          <DialogFooter><DialogClose asChild><Button variant="outline">Close</Button></DialogClose></DialogFooter>
         </DialogContent>
       </Dialog>
     </>
   );
 }
-
-// Add useAuth to ChatHeader context if needed for current user ID
-import { useAuth } from '@/contexts/auth-context'; 

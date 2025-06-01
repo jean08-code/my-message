@@ -21,13 +21,13 @@ export function AppHeader() {
         </Link>
       </div>
       <div className="flex items-center gap-3">
-        {user && ( // Only show if user is logged in
+        {user && user.displayName && (
           <span className="text-sm text-muted-foreground hidden md:inline-block">
-            Logged in as: <span className="font-medium text-foreground">{user.name}</span>
+            Logged in as: <span className="font-medium text-foreground">{user.displayName}</span>
           </span>
         )}
         <ThemeToggle />
-        {user && <UserNav />} {/* Only show UserNav if user is logged in */}
+        {user && <UserNav />}
       </div>
     </header>
   );

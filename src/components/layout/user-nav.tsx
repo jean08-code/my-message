@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -20,8 +21,8 @@ export function UserNav() {
   const { user, logout } = useAuth();
   const router = useRouter();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.push('/login');
   };
 
@@ -29,14 +30,16 @@ export function UserNav() {
     return null;
   }
 
-  const fallbackName = user.name ? user.name.substring(0, 2).toUpperCase() : "U";
+  const fallbackName = user.displayName ? user.displayName.substring(0, 2).toUpperCase() : (user.email ? user.email.substring(0,2).toUpperCase() : "U");
+  const avatarSrc = user.photoURL || `https://placehold.co/100x100.png?text=${fallbackName}`;
+
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-10 rounded-full">
           <Avatar className="h-10 w-10 border-2 border-primary/50">
-            <AvatarImage src={user.avatarUrl} alt={user.name || "User"} data-ai-hint="user avatar" />
+            <AvatarImage src={avatarSrc} alt={user.displayName || "User"} data-ai-hint="user avatar"/>
             <AvatarFallback>{fallbackName}</AvatarFallback>
           </Avatar>
         </Button>
@@ -44,7 +47,7 @@ export function UserNav() {
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user.name}</p>
+            <p className="text-sm font-medium leading-none">{user.displayName || "User"}</p>
             {user.email && <p className="text-xs leading-none text-muted-foreground">
               {user.email}
             </p>}
@@ -52,12 +55,13 @@ export function UserNav() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem asChild>
-            <Link href="/settings">
+          {/* Profile link can be re-enabled when profile page is built out for Firebase users */}
+          {/* <DropdownMenuItem asChild>
+            <Link href="/profile"> {}
               <UserIcon className="mr-2 h-4 w-4" />
               <span>Profile</span>
             </Link>
-          </DropdownMenuItem>
+          </DropdownMenuItem> */}
           <DropdownMenuItem asChild>
              <Link href="/settings">
               <Settings className="mr-2 h-4 w-4" />

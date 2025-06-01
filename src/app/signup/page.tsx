@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -25,6 +26,7 @@ export default function SignupPage() {
     setIsLoading(true);
     try {
       await signup(name, email, password);
+      // Redirect after signup is handled by AuthProvider's onAuthStateChanged or effect in AppLayout
       router.push('/chat');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sign up');
@@ -79,6 +81,7 @@ export default function SignupPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={isLoading}
+                minLength={6} // Firebase default minimum password length
               />
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}

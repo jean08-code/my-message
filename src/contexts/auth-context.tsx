@@ -1,86 +1,131 @@
 
 "use client";
 
-import type { User } from '@/lib/types';
+import type { User as FirebaseUser } from 'firebase/auth'; // Firebase's User type
+import { 
+  getAuth, 
+  onAuthStateChanged, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut as firebaseSignOut,
+  updateProfile
+} from 'firebase/auth';
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { mockUsers } from '@/lib/mock-data';
+import { auth, db } from '@/lib/firebase'; // Firebase app instance
+import type { User as AppUser } from '@/lib/types'; // Your app's User type
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 interface AuthContextType {
-  user: User | null;
+  user: AppUser | null; // Use your AppUser type
   loading: boolean;
   login: (email: string, pass: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   signup: (name: string, email: string, pass: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Helper function to map FirebaseUser to AppUser
+const mapFirebaseUserToAppUser = (firebaseUser: FirebaseUser | null): AppUser | null => {
+  if (!firebaseUser) return null;
+  return {
+    uid: firebaseUser.uid,
+    email: firebaseUser.email,
+    displayName: firebaseUser.displayName,
+    photoURL: firebaseUser.photoURL,
+  };
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedUserJson = localStorage.getItem('rippleChatUser');
-    if (storedUserJson) {
-      try {
-        const storedUser = JSON.parse(storedUserJson) as User;
-        // Validate if storedUser is still a recognizable user from mockUsers
-        const isValidMockUser = mockUsers.some(u => u.id === storedUser.id && u.email === storedUser.email);
-        if (isValidMockUser) {
-          setUser(storedUser);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // Optionally, fetch additional user profile data from Firestore if you store it separately
+        const userDocRef = doc(db, "users", firebaseUser.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          // Merge Firebase Auth data with Firestore data if needed
+          const firestoreUserData = userDocSnap.data();
+          setUser({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            displayName: firestoreUserData.displayName || firebaseUser.displayName,
+            photoURL: firestoreUserData.photoURL || firebaseUser.photoURL,
+          });
         } else {
-          // Stored user is outdated or invalid, clear it
-          localStorage.removeItem('rippleChatUser');
-          setUser(null); // Treat as logged out
+          // If no separate profile, just use auth data
+          setUser(mapFirebaseUserToAppUser(firebaseUser));
         }
-      } catch (error) {
-        // Problem parsing stored user, clear it
-        localStorage.removeItem('rippleChatUser');
+      } else {
         setUser(null);
       }
-    }
-    setLoading(false);
+      setLoading(false);
+    });
+    return () => unsubscribe(); // Cleanup subscription on unmount
   }, []);
 
-  const login = async (email: string, _:string) => {
+  const login = async (email: string, pass: string) => {
     setLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
-    const foundUser = mockUsers.find(u => u.email === email);
-    if (foundUser) {
-      setUser(foundUser);
-      localStorage.setItem('rippleChatUser', JSON.stringify(foundUser));
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+      // onAuthStateChanged will handle setting the user state
+    } catch (error) {
+      console.error("Login error:", error);
       setLoading(false);
-    } else {
+      if (error instanceof Error) {
+        throw new Error(error.message || "Failed to login. Please check your credentials.");
+      }
+      throw new Error("Failed to login. Please check your credentials.");
+    }
+    // setLoading(false) will be handled by onAuthStateChanged effect
+  };
+
+  const logout = async () => {
+    setLoading(true);
+    try {
+      await firebaseSignOut(auth);
+      // onAuthStateChanged will handle setting user to null
+    } catch (error) {
+      console.error("Logout error: ", error);
+      // Still set user to null and loading to false in case of error
+      setUser(null); 
       setLoading(false);
-      throw new Error("User not found or invalid credentials. Please sign up or try a different email.");
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('rippleChatUser');
-    // Optionally, also clear guest ID if you want a full reset for the next guest
-    // localStorage.removeItem('rippleChatGuestId'); 
-  };
-
-  const signup = async (name: string, email: string, _:string) => {
+  const signup = async (name: string, email: string, pass: string) => {
     setLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const newUser: User = {
-      id: `user-${Date.now()}`,
-      name,
-      email,
-      avatarUrl: `https://placehold.co/100x100.png?text=${name.substring(0,1)}`,
-      status: 'online',
-    };
-    setUser(newUser);
-    localStorage.setItem('rippleChatUser', JSON.stringify(newUser));
-    // Note: This new user is not added to the persistent mockUsers array,
-    // so they effectively exist only in localStorage for this session/browser.
-    // For a real app, signup would add them to a database.
-    setLoading(false);
-  };
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+      const firebaseUser = userCredential.user;
+      
+      // Update Firebase Auth profile
+      await updateProfile(firebaseUser, { displayName: name });
 
+      // Create a user document in Firestore (optional, but good for storing additional profile info)
+      const userDocRef = doc(db, "users", firebaseUser.uid);
+      await setDoc(userDocRef, {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: name,
+        photoURL: firebaseUser.photoURL || `https://placehold.co/100x100.png?text=${name.substring(0,1)}`, // Default placeholder
+        createdAt: new Date().toISOString(),
+      });
+
+      // onAuthStateChanged will handle setting the user state with the new profile
+    } catch (error) {
+      console.error("Signup error:", error);
+      setLoading(false);
+      if (error instanceof Error) {
+        throw new Error(error.message || "Failed to sign up.");
+      }
+      throw new Error("Failed to sign up.");
+    }
+    // setLoading(false) will be handled by onAuthStateChanged effect
+  };
 
   return (
     <AuthContext.Provider value={{ user, loading, login, logout, signup }}>

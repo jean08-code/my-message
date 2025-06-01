@@ -8,14 +8,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export default function RootPage() {
   const router = useRouter();
-  const { loading } = useAuth(); // User object no longer needed for initial redirect decision
+  const { loading, user } = useAuth(); 
 
   useEffect(() => {
     if (!loading) {
-      // Always redirect to /chat, whether logged in or guest
+      // If user is loaded (either logged in or null), redirect to /chat.
+      // The /chat route itself (or /chat/[chatId]) will handle further logic
+      // like redirecting to login if necessary, or to a default chat room.
       router.replace('/chat');
     }
-  }, [loading, router]);
+  }, [loading, user, router]);
 
   // Show a loading state while auth is being checked or redirect is happening
   if (loading) {

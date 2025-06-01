@@ -1,7 +1,8 @@
+
 "use client";
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -24,7 +26,9 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await login(email, password);
-      router.push('/chat');
+      // Redirect after login is handled by AuthProvider's onAuthStateChanged or effect in AppLayout
+      const redirectPath = searchParams.get('redirect') || '/chat';
+      router.push(redirectPath);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to login');
     } finally {
