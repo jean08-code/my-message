@@ -11,7 +11,7 @@ import {
   updateProfile
 } from 'firebase/auth';
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { auth, db } from '@/lib/firebase'; // Firebase app instance
+import { auth, db, app as firebaseApp } from '@/lib/firebase'; // Firebase app instance, import app
 import type { User as AppUser } from '@/lib/types'; // Your app's User type
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 
@@ -41,13 +41,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Proactive check for placeholder API key
+    // Ensure firebaseApp and firebaseApp.options are available
+    if (firebaseApp && firebaseApp.options && firebaseApp.options.apiKey === "YOUR_API_KEY") {
+      console.error(
+        "***********************************************************************************\n" +
+        "CRITICAL FIREBASE CONFIGURATION ERROR:\n" +
+        "The API key in src/lib/firebase.ts is still the default placeholder 'YOUR_API_KEY'.\n" +
+        "You MUST replace this with your actual Firebase project's API key for the app to work.\n" +
+        "Go to your Firebase project console -> Project settings -> General -> Your apps -> Web app SDK snippet.\n" +
+        "***********************************************************************************"
+      );
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Optionally, fetch additional user profile data from Firestore if you store it separately
         const userDocRef = doc(db, "users", firebaseUser.uid);
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
-          // Merge Firebase Auth data with Firestore data if needed
           const firestoreUserData = userDocSnap.data();
           setUser({
             uid: firebaseUser.uid,
@@ -56,7 +67,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             photoURL: firestoreUserData.photoURL || firebaseUser.photoURL,
           });
         } else {
-          // If no separate profile, just use auth data
           setUser(mapFirebaseUserToAppUser(firebaseUser));
         }
       } else {
@@ -64,35 +74,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       setLoading(false);
     });
-    return () => unsubscribe(); // Cleanup subscription on unmount
+    return () => unsubscribe(); 
   }, []);
 
   const login = async (email: string, pass: string) => {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, pass);
-      // onAuthStateChanged will handle setting the user state
     } catch (error) {
       console.error("Login error:", error);
       setLoading(false);
-      if (error instanceof Error) {
-        throw new Error(error.message || "Failed to login. Please check your credentials.");
-      }
-      throw new Error("Failed to login. Please check your credentials.");
+      // The error object from Firebase often has a 'code' property.
+      // We can rethrow the original error or a more specific one.
+      throw error; // Re-throw the original Firebase error to be handled by the calling page
     }
-    // setLoading(false) will be handled by onAuthStateChanged effect
   };
 
   const logout = async () => {
     setLoading(true);
     try {
       await firebaseSignOut(auth);
-      // onAuthStateChanged will handle setting user to null
     } catch (error) {
       console.error("Logout error: ", error);
-      // Still set user to null and loading to false in case of error
       setUser(null); 
       setLoading(false);
+      throw error;
     }
   };
 
@@ -102,29 +108,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       const firebaseUser = userCredential.user;
       
-      // Update Firebase Auth profile
       await updateProfile(firebaseUser, { displayName: name });
 
-      // Create a user document in Firestore (optional, but good for storing additional profile info)
       const userDocRef = doc(db, "users", firebaseUser.uid);
       await setDoc(userDocRef, {
         uid: firebaseUser.uid,
         email: firebaseUser.email,
         displayName: name,
-        photoURL: firebaseUser.photoURL || `https://placehold.co/100x100.png?text=${name.substring(0,1)}`, // Default placeholder
+        photoURL: firebaseUser.photoURL || `https://placehold.co/100x100.png?text=${name.substring(0,1)}`,
         createdAt: new Date().toISOString(),
       });
-
-      // onAuthStateChanged will handle setting the user state with the new profile
     } catch (error) {
       console.error("Signup error:", error);
       setLoading(false);
-      if (error instanceof Error) {
-        throw new Error(error.message || "Failed to sign up.");
-      }
-      throw new Error("Failed to sign up.");
+      throw error; // Re-throw the original Firebase error
     }
-    // setLoading(false) will be handled by onAuthStateChanged effect
   };
 
   return (
