@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { User } from '@/lib/types';
@@ -7,7 +8,7 @@ import { mockUsers } from '@/lib/mock-data';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, pass: string) => Promise<void>; // Keep simple, actual validation not implemented
+  login: (email: string, pass: string) => Promise<void>;
   logout: () => void;
   signup: (name: string, email: string, pass: string) => Promise<void>;
 }
@@ -19,7 +20,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate checking auth status from localStorage or a cookie
     const storedUser = localStorage.getItem('rippleChatUser');
     if (storedUser) {
       setUser(JSON.parse(storedUser));
@@ -28,31 +28,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (email: string, _:string) => {
-    // Mock login: find user by email from mock data, ignore password
-    // In a real app, this would be an API call
     setLoading(true);
     await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
     const foundUser = mockUsers.find(u => u.email === email);
     if (foundUser) {
       setUser(foundUser);
       localStorage.setItem('rippleChatUser', JSON.stringify(foundUser));
+      setLoading(false);
     } else {
-      // For simplicity, if not found, log in as the first mock user
-      // Or handle error: throw new Error("User not found or invalid credentials");
-      setUser(mockUsers[0]);
-      localStorage.setItem('rippleChatUser', JSON.stringify(mockUsers[0]));
+      setLoading(false);
+      // Throw an error if user is not found, instead of defaulting
+      throw new Error("User not found or invalid credentials. Please sign up or try a different email.");
     }
-    setLoading(false);
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem('rippleChatUser');
+    // Optionally, also clear guest ID if you want a full reset for the next guest
+    // localStorage.removeItem('rippleChatGuestId'); 
   };
 
   const signup = async (name: string, email: string, _:string) => {
-    // Mock signup: create a new user and log them in
-    // In a real app, this would be an API call
     setLoading(true);
     await new Promise(resolve => setTimeout(resolve, 500));
     const newUser: User = {
@@ -62,11 +59,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       avatarUrl: `https://placehold.co/100x100.png?text=${name.substring(0,1)}`,
       status: 'online',
     };
-    // In a real app, you'd probably add this to your backend.
-    // For mock, we just set this new user.
     setUser(newUser);
     localStorage.setItem('rippleChatUser', JSON.stringify(newUser));
-    // mockUsers.push(newUser); // Not persistent, but for demo
+    // Note: This new user is not added to the persistent mockUsers array,
+    // so they effectively exist only in localStorage for this session/browser.
+    // For a real app, signup would add them to a database.
     setLoading(false);
   };
 
