@@ -9,7 +9,7 @@ import { MessageSquare } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 
 export function AppHeader() {
-  const { user } = useAuth();
+  const { user } = useAuth(); // Get current user state
 
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b bg-card px-4 shadow-sm sm:px-6">
@@ -21,13 +21,13 @@ export function AppHeader() {
         </Link>
       </div>
       <div className="flex items-center gap-3">
-        {user && (
+        {user && ( // Only show if user is logged in
           <span className="text-sm text-muted-foreground hidden md:inline-block">
             Logged in as: <span className="font-medium text-foreground">{user.name}</span>
           </span>
         )}
         <ThemeToggle />
-        <UserNav />
+        {user && <UserNav />} {/* Only show UserNav if user is logged in */}
       </div>
     </header>
   );

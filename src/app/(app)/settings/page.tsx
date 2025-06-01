@@ -1,20 +1,23 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth-context';
+import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from '@/components/ui/separator';
-import { ThemeToggle } from '@/components/theme-toggle'; // Re-using the toggle
-import { Bell, Palette, UserCircle2 } from 'lucide-react';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { Bell, Palette, UserCircle2, AlertTriangle } from 'lucide-react';
 import type { User, NotificationSettings as AppNotificationSettings } from '@/lib/types';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function SettingsPage() {
-  const { user, loading: authLoading, signup: updateUserProfile } = useAuth(); // Assuming signup can update profile
+  const { user, loading: authLoading, signup: updateUserProfile } = useAuth();
+  const router = useRouter();
   
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -28,31 +31,32 @@ export default function SettingsPage() {
   const [isSavingNotifications, setIsSavingNotifications] = useState(false);
 
   useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace('/login?redirect=/settings'); // Redirect to login if not authenticated
+    }
     if (user) {
       setName(user.name);
       setEmail(user.email || '');
       setAvatarUrl(user.avatarUrl || '');
     }
-    // Load notification settings from localStorage or a similar mock source
     const storedSettings = localStorage.getItem('rippleChatNotificationSettings');
     if (storedSettings) {
       setNotificationSettings(JSON.parse(storedSettings));
     }
-  }, [user]);
+  }, [user, authLoading, router]);
 
   const handleProfileSave = async () => {
     if (!user) return;
     setIsSavingProfile(true);
-    // In a real app, this would be an API call to update user profile
-    // Mocking update by calling signup function (which sets user context) with existing email & new name
-    // This is a hack for mock purposes. A proper updateUser function in useAuth would be better.
     try {
-      await updateUserProfile(name, user.email || '', 'dummyPassword'); 
-      // Update local state if necessary, though useAuth should trigger re-render
-      // Potentially show a success toast
+      // This is a mock update. In a real app, use a dedicated update function.
+      // For now, re-using signup updates the user in context.
+      const updatedUser = { ...user, name, avatarUrl }; 
+      localStorage.setItem('rippleChatUser', JSON.stringify(updatedUser)); // Mock update
+      // Call a function to update user context if signup doesn't do it well enough
+      // For mock, this might be enough, or use a toast to indicate manual refresh if needed
     } catch (error) {
       console.error("Failed to save profile", error);
-      // Show error toast
     }
     setIsSavingProfile(false);
   };
@@ -62,7 +66,6 @@ export default function SettingsPage() {
     const newSettings = { ...notificationSettings, [key]: value };
     setNotificationSettings(newSettings);
     localStorage.setItem('rippleChatNotificationSettings', JSON.stringify(newSettings));
-    // Simulate save delay
     setTimeout(() => setIsSavingNotifications(false), 500);
   };
 
@@ -70,7 +73,20 @@ export default function SettingsPage() {
     return <div className="p-6">Loading settings...</div>;
   }
 
-  const fallbackName = user?.name ? user.name.substring(0, 2).toUpperCase() : "U";
+  if (!user) {
+    // This state should ideally be handled by the redirect, but as a fallback:
+    return (
+      <div className="container mx-auto max-w-3xl py-8 px-4">
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Access Denied</AlertTitle>
+          <AlertDescription>You need to be logged in to access settings. Redirecting to login...</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  const fallbackName = user.name ? user.name.substring(0, 2).toUpperCase() : "U";
 
   return (
     <div className="container mx-auto max-w-3xl py-8 px-4 space-y-8">
@@ -104,7 +120,7 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled />
+              <Input id="email" type="email" value={email} disabled /> {/* Email typically not changed here easily */}
             </div>
           </div>
           <Button onClick={handleProfileSave} disabled={isSavingProfile}>
@@ -148,7 +164,6 @@ export default function SettingsPage() {
               disabled={isSavingNotifications}
             />
           </div>
-          {/* Placeholder for individual chat mute settings */}
           <p className="text-sm text-muted-foreground">
             Individual chat notification settings will be available here in a future update.
           </p>

@@ -1,25 +1,23 @@
+
 "use client";
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/auth-context'; // Assuming useAuth provides loading state
+import { useAuth } from '@/contexts/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function RootPage() {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { loading } = useAuth(); // User object no longer needed for initial redirect decision
 
   useEffect(() => {
     if (!loading) {
-      if (user) {
-        router.replace('/chat');
-      } else {
-        router.replace('/login');
-      }
+      // Always redirect to /chat, whether logged in or guest
+      router.replace('/chat');
     }
-  }, [user, loading, router]);
+  }, [loading, router]);
 
-  // Optional: Show a loading state while auth is being checked
+  // Show a loading state while auth is being checked or redirect is happening
   if (loading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center">
@@ -32,5 +30,5 @@ export default function RootPage() {
     );
   }
 
-  return null; // Or a minimal loading indicator, redirect will handle it
+  return null; // Redirect will handle it
 }

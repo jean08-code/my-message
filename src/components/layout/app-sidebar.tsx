@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -12,18 +13,19 @@ import {
 import { MessageSquare, Settings, Users, ChevronLeftSquare } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ThemeToggle } from "../theme-toggle"; // If putting theme toggle in sidebar footer
 import { Button } from "../ui/button";
-import { useSidebar } from "@/components/ui/sidebar"; // To get toggleSidebar for custom button
+import { useSidebar } from "@/components/ui/sidebar";
+import { useAuth } from "@/contexts/auth-context"; // Import useAuth
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { toggleSidebar, state: sidebarState } = useSidebar();
+  const { toggleSidebar } = useSidebar();
+  const { user } = useAuth(); // Get current user state
 
   const navItems = [
-    { href: "/chat", label: "Chats", icon: MessageSquare },
-    // { href: "/contacts", label: "Contacts", icon: Users }, // Example for future
-    { href: "/settings", label: "Settings", icon: Settings },
+    { href: "/chat", label: "Chats", icon: MessageSquare, show: true }, // Always show Chat
+    // { href: "/contacts", label: "Contacts", icon: Users, show: !!user }, // Example: show only if logged in
+    { href: "/settings", label: "Settings", icon: Settings, show: !!user }, // Only show Settings if user is logged in
   ];
 
   return (
@@ -39,7 +41,7 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
-          {navItems.map((item) => (
+          {navItems.filter(item => item.show).map((item) => ( // Filter items based on show condition
             <SidebarMenuItem key={item.href}>
               <Link href={item.href} passHref legacyBehavior>
                 <SidebarMenuButton
@@ -55,9 +57,6 @@ export function AppSidebar() {
           ))}
         </SidebarMenu>
       </SidebarContent>
-      {/* <SidebarFooter className="p-2 group-data-[collapsible=icon]:hidden">
-        <ThemeToggle />
-      </SidebarFooter> */}
     </Sidebar>
   );
 }
