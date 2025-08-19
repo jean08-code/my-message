@@ -33,6 +33,18 @@ export interface Chat {
   // lastMessage, unreadCount etc. will be added when ChatList is built
 }
 
+export interface Story {
+    id: string; // Document ID from Firestore
+    userId: string; // Firebase UID of the user who posted
+    userDisplayName: string | null;
+    userPhotoURL: string | null;
+    mediaUrl: string;
+    mediaType: string; // e.g., 'image/jpeg'
+    timestamp: number; // Firestore serverTimestamp
+    expiresAt: number;
+}
+
+
 export interface NotificationSettings {
   muteAll: boolean;
   mutedChats: string[]; // Array of chat IDs
