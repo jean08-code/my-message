@@ -1,44 +1,68 @@
 
 "use client";
 
-// import { mockChats, mockUsers } from "@/lib/mock-data"; // Mock data deprecated
-// import type { Chat } from "@/lib/types";
-// import Link from "next/link";
-// import { useParams, usePathname } from "next/navigation";
-// import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-// import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-// import { cn } from "@/lib/utils";
-// import { formatDistanceToNowStrict } from 'date-fns';
-// import { PresenceIndicator } from "./presence-indicator";
+import React, { useState, useEffect } from 'react';
+import Link from "next/link";
 import { useAuth } from "@/contexts/auth-context";
+import { db, isFirebaseConfigured } from '@/lib/firebase';
+import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
+import type { User } from '@/lib/types';
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "../ui/input";
-import { Search, AlertTriangle } from "lucide-react";
-import React, { useState } from "react";
-import { Card, CardContent, CardHeader } from '../ui/card';
-import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { Search, User as UserIcon } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
+import { usePathname } from 'next/navigation';
 
 export function ChatList() {
-  // const params = useParams();
-  // const pathname = usePathname();
   const { user: currentUser } = useAuth();
+  const pathname = usePathname();
   const [searchTerm, setSearchTerm] = useState("");
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // const filteredChats = mockChats.filter(chat => { // Mock data deprecated
-  //   const chatName = chat.isGroup ? chat.name : chat.participants.find(p => p.id !== currentUser?.id)?.name;
-  //   return chatName?.toLowerCase().includes(searchTerm.toLowerCase());
-  // });
+  useEffect(() => {
+    if (!isFirebaseConfigured || !currentUser) {
+      setLoading(false);
+      return;
+    }
+
+    const usersColRef = collection(db, 'users');
+    const q = query(usersColRef, orderBy('displayName', 'asc'));
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const fetchedUsers: User[] = [];
+      querySnapshot.forEach((doc) => {
+        // We only want to list OTHER users, not the current user
+        if (doc.id !== currentUser.uid) {
+           fetchedUsers.push({
+            uid: doc.id,
+            ...doc.data()
+          } as User);
+        }
+      });
+      setUsers(fetchedUsers);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching users:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [currentUser]);
+
+  const filteredUsers = users.filter(user =>
+    user.displayName?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
   
-  if (!currentUser) {
-    // This part might not be hit if layout redirects, but as a safeguard
-    return (
-        <div className="flex h-full flex-col border-r bg-card p-4 items-center justify-center">
-            <p className="text-muted-foreground">Please log in to see chats.</p>
-        </div>
-    );
-  }
+  // Helper to create a consistent chat ID for 1-on-1 chats
+  const createChatId = (otherUserUid: string) => {
+    if (!currentUser) return '';
+    // Sort UIDs to ensure the ID is the same regardless of who starts the chat
+    return [currentUser.uid, otherUserUid].sort().join('_');
+  };
 
-  // Placeholder content until ChatList is fully integrated with Firestore
   return (
     <div className="flex h-full flex-col border-r bg-card">
       <div className="p-4 border-b">
@@ -46,35 +70,70 @@ export function ChatList() {
         <div className="relative mt-2">
           <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input 
-            placeholder="Search chats..." 
+            placeholder="Search users..." 
             className="pl-8"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            disabled // Disabled until Firestore integration
+            disabled={!isFirebaseConfigured}
           />
         </div>
       </div>
       <ScrollArea className="flex-1">
-        <div className="p-4">
-            <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Under Development</AlertTitle>
-                <AlertDescription>
-                    Chat list functionality is being upgraded to use live data from Firebase. 
-                    Currently, please navigate to chats directly via URL (e.g., /chat/general).
-                </AlertDescription>
-            </Alert>
-        </div>
-        {/* 
-        // Example structure for when Firestore data is available
         <nav className="flex flex-col gap-1 p-2">
-          {filteredChats.length > 0 ? filteredChats.map((chat) => {
-            // ... chat item rendering logic ...
-          }) : (
-            <p className="p-4 text-center text-sm text-muted-foreground">No chats found.</p>
-          )}
-        </nav> 
-        */}
+           {/* Link to the main group chat */}
+           <Link href="/chat/general" legacyBehavior>
+                <a className={cn(
+                    "flex items-center gap-3 rounded-md p-2 text-sm font-medium transition-colors hover:bg-muted",
+                    pathname === '/chat/general' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'
+                )}>
+                    <Avatar className="h-9 w-9 border">
+                         <AvatarFallback className="bg-primary text-primary-foreground">#</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 truncate">
+                        <p className="font-semibold">general</p>
+                        <p className="text-xs">Public group chat</p>
+                    </div>
+                </a>
+            </Link>
+
+            <h3 className="px-2 pt-4 pb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Users</h3>
+
+            {loading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-3 rounded-md p-2">
+                        <Skeleton className="h-9 w-9 rounded-full" />
+                        <div className="flex-1 space-y-1">
+                            <Skeleton className="h-4 w-3/4" />
+                            <Skeleton className="h-3 w-1/2" />
+                        </div>
+                    </div>
+                ))
+            ) : filteredUsers.length > 0 ? (
+                filteredUsers.map((user) => {
+                    const chatId = createChatId(user.uid);
+                    const fallback = user.displayName ? user.displayName.substring(0, 2).toUpperCase() : '??';
+                    return (
+                        <Link href={`/chat/${chatId}`} key={user.uid} legacyBehavior>
+                            <a className={cn(
+                                "flex items-center gap-3 rounded-md p-2 text-sm font-medium transition-colors hover:bg-muted",
+                                pathname === `/chat/${chatId}` ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'
+                            )}>
+                                <Avatar className="h-9 w-9 border">
+                                    <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'User'} data-ai-hint="user avatar" />
+                                    <AvatarFallback>{fallback}</AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 truncate">
+                                    <p className="font-semibold">{user.displayName}</p>
+                                    <p className="text-xs">Direct Message</p>
+                                </div>
+                            </a>
+                        </Link>
+                    )
+                })
+            ) : (
+                <p className="p-4 text-center text-sm text-muted-foreground">No other users found.</p>
+            )}
+        </nav>
       </ScrollArea>
     </div>
   );
