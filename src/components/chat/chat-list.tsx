@@ -80,23 +80,7 @@ export function ChatList() {
       </div>
       <ScrollArea className="flex-1">
         <nav className="flex flex-col gap-1 p-2">
-           {/* Link to the main group chat */}
-           <Link href="/chat/general" legacyBehavior>
-                <a className={cn(
-                    "flex items-center gap-3 rounded-md p-2 text-sm font-medium transition-colors hover:bg-muted",
-                    pathname === '/chat/general' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'
-                )}>
-                    <Avatar className="h-9 w-9 border">
-                         <AvatarFallback className="bg-primary text-primary-foreground">#</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 truncate">
-                        <p className="font-semibold">general</p>
-                        <p className="text-xs">Public group chat</p>
-                    </div>
-                </a>
-            </Link>
-
-            <h3 className="px-2 pt-4 pb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Users</h3>
+            <h3 className="px-2 pt-2 pb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Users</h3>
 
             {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
