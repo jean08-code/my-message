@@ -23,9 +23,17 @@ export function ChatList() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isFirebaseConfigured || !currentUser) {
+    if (!isFirebaseConfigured) {
       setLoading(false);
+      // In mock mode, we can add some mock users if needed for UI testing
+      // For now, it will just be empty as we focus on Firebase.
       return;
+    }
+    
+    if (!currentUser) {
+        setLoading(false);
+        // If no user is logged in, don't fetch the user list
+        return;
     }
 
     const usersColRef = collection(db, 'users');
