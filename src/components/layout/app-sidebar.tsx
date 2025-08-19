@@ -10,7 +10,7 @@ import {
   SidebarMenuButton,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { MessageSquare, Settings, Users, ChevronLeftSquare } from "lucide-react";
+import { MessageSquare, Settings, Users, ChevronLeftSquare, GalleryHorizontal } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "../ui/button";
@@ -23,9 +23,9 @@ export function AppSidebar() {
   const { user } = useAuth(); // Get current user state
 
   const navItems = [
-    { href: "/chat", label: "Chats", icon: MessageSquare, show: true }, // Always show Chat
-    // { href: "/contacts", label: "Contacts", icon: Users, show: !!user }, // Example: show only if logged in
-    { href: "/settings", label: "Settings", icon: Settings, show: !!user }, // Only show Settings if user is logged in
+    { href: "/chat", label: "Chats", icon: MessageSquare, show: true },
+    { href: "/story", label: "Story", icon: GalleryHorizontal, show: true },
+    { href: "/settings", label: "Settings", icon: Settings, show: !!user },
   ];
 
   return (

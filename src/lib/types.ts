@@ -14,6 +14,7 @@ export interface Message {
   chatId: string;
   senderId: string; // Firebase UID of the sender
   senderName?: string | null; // displayName of the sender, denormalized for convenience
+  senderPhotoURL?: string | null;
   text: string;
   timestamp: number; // Firestore serverTimestamp will be used, but number for client-side sorting
   // isOwn is a client-side helper, will be determined by comparing senderId with current user's UID

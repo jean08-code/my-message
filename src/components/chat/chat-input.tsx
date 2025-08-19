@@ -12,7 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { storage } from "@/lib/firebase";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytesResumable, getDownloadURL, UploadTask } from "firebase/storage";
 import { Progress } from "../ui/progress";
 
 interface ChatInputProps {
@@ -88,6 +88,7 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
 
   const [uploadingFile, setUploadingFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadTask, setUploadTask] = useState<UploadTask | null>(null);
 
   const handleSend = () => {
     if (message.trim()) {
@@ -123,6 +124,11 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
         });
         return;
       }
+      
+      const toastId = toast({
+        title: "Preparing upload...",
+        description: `Compressing ${file.name}...`,
+      }).id;
 
       setUploadingFile(file);
       setUploadProgress(0);
@@ -130,24 +136,32 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
       try {
         const fileToUpload = await compressImage(file);
         const storageRef = ref(storage, `chat-attachments/${chatId}/${Date.now()}_${file.name}`);
-        const uploadTask = uploadBytesResumable(storageRef, fileToUpload);
+        const newUploadTask = uploadBytesResumable(storageRef, fileToUpload);
+        setUploadTask(newUploadTask);
 
-        uploadTask.on('state_changed',
+        newUploadTask.on('state_changed',
           (snapshot) => {
             const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
             setUploadProgress(progress);
+             toast({
+                id: toastId,
+                title: "Uploading...",
+                description: `Sending ${file.name} - ${Math.round(progress)}%`,
+             });
           },
           (error) => {
             console.error("Upload failed:", error);
             toast({
+              id: toastId,
               title: "Upload Failed",
               description: "Your file could not be uploaded. Please try again.",
               variant: "destructive"
             });
             setUploadingFile(null);
+            setUploadTask(null);
           },
           () => {
-            getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+            getDownloadURL(newUploadTask.snapshot.ref).then((downloadURL) => {
               onSendMessage({
                 attachmentUrl: downloadURL,
                 attachmentType: file.type,
@@ -155,22 +169,26 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
                 text: message // Send any typed text along with the file
               });
               toast({
+                id: toastId,
                 title: "File Sent!",
                 description: `${file.name} has been sent.`,
               });
               setMessage(""); // Clear message input after sending attachment
               setUploadingFile(null);
+              setUploadTask(null);
             });
           }
         );
       } catch (error) {
         console.error("Image compression or upload failed", error);
         toast({
+            id: toastId,
             title: "Upload Failed",
             description: "There was an error processing your file.",
             variant: "destructive"
         });
         setUploadingFile(null);
+        setUploadTask(null);
       }
 
 
@@ -181,10 +199,17 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
   };
   
   const handleCancelUpload = () => {
-    // In a real app, you would need to cancel the upload task.
-    // For simplicity, we just clear the state here.
+    if (uploadTask) {
+        uploadTask.cancel();
+        toast({
+            title: "Upload Cancelled",
+            description: `Upload of ${uploadingFile?.name} was cancelled.`,
+            variant: "destructive"
+        });
+    }
     setUploadingFile(null);
     setUploadProgress(0);
+    setUploadTask(null);
   };
 
 
@@ -263,7 +288,7 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
                     <File className="h-5 w-5 shrink-0" />
                     <div className="text-sm truncate">
                         <p className="font-medium truncate">{uploadingFile.name}</p>
-                        <p className="text-xs text-muted-foreground">{uploadingFile.type.startsWith('image/') ? "Compressing & uploading..." : "Uploading..."} {Math.round(uploadProgress)}%</p>
+                        <p className="text-xs text-muted-foreground">{uploadingFile.type.startsWith('image/') ? "Compressing & uploading..." : "Uploading..."}</p>
                     </div>
                 </div>
                 <Button variant="ghost" size="icon" className="shrink-0" onClick={handleCancelUpload}>
@@ -369,5 +394,3 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
     </div>
   );
 }
-
-    
