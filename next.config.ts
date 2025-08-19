@@ -3,6 +3,15 @@ import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
+  async redirects() {
+    return [
+      {
+        source: '/',
+        destination: '/chat',
+        permanent: true,
+      },
+    ]
+  },
   typescript: {
     // This will prevent TypeScript errors from failing the build.
     ignoreBuildErrors: true,
