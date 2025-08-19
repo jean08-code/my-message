@@ -18,6 +18,9 @@ export interface Message {
   timestamp: number; // Firestore serverTimestamp will be used, but number for client-side sorting
   // isOwn is a client-side helper, will be determined by comparing senderId with current user's UID
   // MessageStatus (sent/delivered/read) is removed for simplicity
+  attachmentUrl?: string;
+  attachmentType?: string;
+  attachmentName?: string;
 }
 
 // Chat interface - this will evolve as we integrate ChatList with Firestore

@@ -4,16 +4,19 @@
 import { useState, useRef, KeyboardEvent, ChangeEvent, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Paperclip, SendHorizonal, Smile, Mic, StopCircle, AlertTriangle } from "lucide-react";
+import { Paperclip, SendHorizonal, Smile, Mic, StopCircle, AlertTriangle, File, X } from "lucide-react";
 import { SmartReplyButton } from "./smart-reply-button";
 import { Skeleton } from "../ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { storage } from "@/lib/firebase";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { Progress } from "../ui/progress";
 
 interface ChatInputProps {
-  onSendMessage: (text: string) => void;
+  onSendMessage: (data: { text?: string; attachmentUrl?: string; attachmentType?: string, attachmentName?: string }) => void;
   smartReplies: string[];
   isLoadingSmartReplies: boolean;
 }
@@ -32,16 +35,19 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
   const [showMicPermissionAlert, setShowMicPermissionAlert] = useState(false);
   const [isEmojiPopoverOpen, setIsEmojiPopoverOpen] = useState(false);
 
+  const [uploadingFile, setUploadingFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+
   const handleSend = () => {
     if (message.trim()) {
-      onSendMessage(message.trim());
+      onSendMessage({ text: message.trim() });
       setMessage("");
       textareaRef.current?.focus();
     }
   };
 
   const handleSmartReplyClick = (reply: string) => {
-    onSendMessage(reply);
+    onSendMessage({ text: reply });
   };
   
   const handleKeyPress = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -58,17 +64,65 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      const fileSizeKB = (file.size / 1024).toFixed(1);
-      onSendMessage(`📎 Attached: ${file.name} (${fileSizeKB} KB)`);
-      toast({
-        title: "File Attached",
-        description: `${file.name} (${fileSizeKB} KB) was sent as a message.`,
-      });
+      if (!storage) {
+        toast({
+            title: "Firebase Storage Error",
+            description: "Storage is not configured, cannot upload files.",
+            variant: "destructive"
+        });
+        return;
+      }
+      setUploadingFile(file);
+      setUploadProgress(0);
+
+      const storageRef = ref(storage, `chat-attachments/${chatId}/${Date.now()}_${file.name}`);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on('state_changed',
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(progress);
+        },
+        (error) => {
+          console.error("Upload failed:", error);
+          toast({
+            title: "Upload Failed",
+            description: "Your file could not be uploaded. Please try again.",
+            variant: "destructive"
+          });
+          setUploadingFile(null);
+        },
+        () => {
+          getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+            onSendMessage({
+              attachmentUrl: downloadURL,
+              attachmentType: file.type,
+              attachmentName: file.name,
+              text: message // Send any typed text along with the file
+            });
+            toast({
+              title: "File Sent!",
+              description: `${file.name} has been sent.`,
+            });
+            setMessage(""); // Clear message input after sending attachment
+            setUploadingFile(null);
+          });
+        }
+      );
+
       if (fileInputRef.current) {
         fileInputRef.current.value = ""; // Reset file input
       }
     }
   };
+  
+  const handleCancelUpload = () => {
+    // In a real app, you would need to cancel the upload task.
+    // For simplicity, we just clear the state here.
+    setUploadingFile(null);
+    setUploadProgress(0);
+  };
+
 
   const handleEmojiSelect = (emoji: string) => {
     setMessage(prevMessage => prevMessage + emoji);
@@ -84,7 +138,7 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
         audioStream.getTracks().forEach(track => track.stop());
         setAudioStream(null);
       }
-      onSendMessage("🎤 Voice Note sent (mocked)");
+      onSendMessage({ text: "🎤 Voice Note sent (mocked)" });
       toast({
         title: "Voice Note",
         description: "Voice note sent (mocked recording).",
@@ -120,6 +174,13 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
     };
   }, [audioStream]);
 
+  const [chatId, setChatId] = useState('');
+    useEffect(() => {
+        if (window.location.pathname.includes('/chat/')) {
+            setChatId(window.location.pathname.split('/chat/')[1]);
+        }
+    }, []);
+
   return (
     <div className="border-t bg-card p-3 md:p-4 space-y-2">
       {showMicPermissionAlert && micPermission === 'denied' && (
@@ -130,6 +191,23 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
             To send voice notes, please enable microphone permissions in your browser settings and try again.
           </AlertDescription>
         </Alert>
+      )}
+      {uploadingFile && (
+        <div className="p-2 rounded-lg border bg-muted/50">
+            <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 overflow-hidden">
+                    <File className="h-5 w-5 shrink-0" />
+                    <div className="text-sm truncate">
+                        <p className="font-medium truncate">{uploadingFile.name}</p>
+                        <p className="text-xs text-muted-foreground">Uploading... {Math.round(uploadProgress)}%</p>
+                    </div>
+                </div>
+                <Button variant="ghost" size="icon" className="shrink-0" onClick={handleCancelUpload}>
+                    <X className="h-4 w-4"/>
+                </Button>
+            </div>
+            <Progress value={uploadProgress} className="h-1 mt-1" />
+        </div>
       )}
       { (isLoadingSmartReplies || smartReplies.length > 0) && (
         <div className="flex gap-2 overflow-x-auto pb-2">
@@ -147,7 +225,7 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
         </div>
       )}
       <div className="flex items-end gap-2">
-        <Button variant="ghost" size="icon" className="shrink-0" onClick={handleAttachmentClick} disabled={isRecording}>
+        <Button variant="ghost" size="icon" className="shrink-0" onClick={handleAttachmentClick} disabled={isRecording || !!uploadingFile}>
           <Paperclip className="h-5 w-5" />
           <span className="sr-only">Attach file</span>
         </Button>
@@ -156,12 +234,12 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
           ref={fileInputRef} 
           onChange={handleFileChange} 
           className="hidden" 
-          disabled={isRecording}
+          disabled={isRecording || !!uploadingFile}
         />
         
         <Popover open={isEmojiPopoverOpen} onOpenChange={setIsEmojiPopoverOpen}>
           <PopoverTrigger asChild>
-            <Button variant="ghost" size="icon" className="shrink-0" disabled={isRecording}>
+            <Button variant="ghost" size="icon" className="shrink-0" disabled={isRecording || !!uploadingFile}>
               <Smile className="h-5 w-5" />
               <span className="sr-only">Add emoji</span>
             </Button>
@@ -192,10 +270,10 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
             placeholder={isRecording ? "Recording voice note..." : "Type a message..."}
             className={cn(
               "flex-1 resize-none rounded-full border-input bg-background px-4 py-2.5 text-sm focus-visible:ring-1 min-h-[44px] max-h-[120px]",
-              isRecording && "pr-12 bg-muted/50 cursor-not-allowed"
+              (isRecording || !!uploadingFile) && "pr-12 bg-muted/50 cursor-not-allowed"
             )}
             rows={1}
-            disabled={isRecording}
+            disabled={isRecording || !!uploadingFile}
           />
           {isRecording && micPermission === 'granted' && (
              <span className="absolute right-3 bottom-2.5 text-xs text-primary animate-pulse">REC</span>
@@ -213,6 +291,7 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
             isRecording ? "bg-red-500 hover:bg-red-600" : "bg-primary hover:bg-primary/90"
           )}
           aria-label={isRecording ? "Stop recording" : (message.trim() ? "Send message" : "Record voice note")}
+          disabled={!!uploadingFile}
         >
           {isRecording ? (
             <StopCircle className="h-5 w-5" />

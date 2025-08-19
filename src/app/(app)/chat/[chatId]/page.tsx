@@ -66,6 +66,19 @@ export default function ChatConversationPage() {
 
     // Fetch chat details (like name) if needed - for now, simple name
     const fetchChatDetails = async () => {
+      // For 1-on-1 chats, the name should be the other user's name
+      if (currentUser && chatId.includes('_')) {
+        const otherUserId = chatId.split('_').filter(id => id !== currentUser.uid)[0];
+        if (otherUserId) {
+          const userDocRef = doc(db, 'users', otherUserId);
+          const userDocSnap = await getDoc(userDocRef);
+          if (userDocSnap.exists()) {
+            setChatName(userDocSnap.data().displayName || 'Chat User');
+          }
+          return;
+        }
+      }
+      
       const chatDocRef = doc(db, 'chats', chatId);
       const chatDocSnap = await getDoc(chatDocRef);
       if (chatDocSnap.exists() && chatDocSnap.data().name) {
@@ -92,6 +105,9 @@ export default function ChatConversationPage() {
           senderName: data.senderName,
           text: data.text,
           timestamp: (data.timestamp as Timestamp)?.toDate().getTime() || Date.now(),
+          attachmentUrl: data.attachmentUrl,
+          attachmentType: data.attachmentType,
+          attachmentName: data.attachmentName
         });
       });
       setMessages(fetchedMessages);
@@ -122,8 +138,9 @@ export default function ChatConversationPage() {
   //   }
   // }, [messages, currentUser]);
 
-  const handleSendMessage = async (text: string) => {
-    if (!currentUser || !chatId || !text.trim()) return;
+  const handleSendMessage = async (data: { text?: string; attachmentUrl?: string; attachmentType?: string, attachmentName?: string }) => {
+    const { text, attachmentUrl, attachmentType, attachmentName } = data;
+    if (!currentUser || !chatId || (!text?.trim() && !attachmentUrl)) return;
 
     if (!isFirebaseConfigured) {
         // Handle mock message sending
@@ -132,8 +149,11 @@ export default function ChatConversationPage() {
             chatId: chatId,
             senderId: currentUser.uid,
             senderName: currentUser.displayName,
-            text: text.trim(),
+            text: text?.trim() || '',
             timestamp: Date.now(),
+            attachmentUrl: attachmentUrl,
+            attachmentType: attachmentType,
+            attachmentName: attachmentName,
         };
         setMessages(prevMessages => [...prevMessages, newMessage]);
         return;
@@ -144,8 +164,12 @@ export default function ChatConversationPage() {
       await addDoc(messagesColRef, {
         senderId: currentUser.uid,
         senderName: currentUser.displayName || currentUser.email || "Anonymous",
-        text: text.trim(),
+        senderPhotoURL: currentUser.photoURL,
+        text: text?.trim() || '',
         timestamp: serverTimestamp(), // Use Firestore server timestamp
+        attachmentUrl: attachmentUrl || null,
+        attachmentType: attachmentType || null,
+        attachmentName: attachmentName || null,
       });
       // Smart replies trigger logic removed
     } catch (error) {
@@ -178,7 +202,7 @@ export default function ChatConversationPage() {
   }
   
   const mockParticipantsForHeader: AppUser[] = currentUser ? [currentUser] : []; 
-  const isGroupChat = chatId.toLowerCase() === 'general';
+  const isGroupChat = !chatId.includes('_');
 
   return (
     <div className="flex h-full max-h-[calc(100vh-theme(spacing.16))] flex-col bg-background">
