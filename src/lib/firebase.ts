@@ -6,13 +6,12 @@ import { getFirestore } from "firebase/firestore";
 
 // TODO: Replace with your actual Firebase project configuration
 const firebaseConfig: FirebaseOptions = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID",
-  measurementId: "YOUR_MEASUREMENT_ID" // Optional
+  projectId: "ripplechat-mtir3",
+  appId: "1:497978174070:web:fe08b0705833a0f86c0d57",
+  storageBucket: "ripplechat-mtir3.firebasestorage.app",
+  apiKey: "AIzaSyB8Va1PueHY5cDdq37Qb4hfsAHrerBtz4E",
+  authDomain: "ripplechat-mtir3.firebaseapp.com",
+  messagingSenderId: "497978174070"
 };
 
 // A function to check if the config is still using placeholder values
@@ -29,7 +28,7 @@ if (isFirebaseConfigured) {
 }
 
 
-const auth = isFirebaseConfigured ? getAuth(app) : null;
-const db = isFirebaseConfigured ? getFirestore(app) : null;
+const auth = isFirebaseConfigured ? getAuth(app!) : null;
+const db = isFirebaseConfigured ? getFirestore(app!) : null;
 
 export { app, auth, db };
