@@ -10,7 +10,7 @@ import { ChatInput } from '@/components/chat/chat-input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/auth-context';
-import { db } from '@/lib/firebase';
+import { db, isFirebaseConfigured } from '@/lib/firebase';
 import { 
   collection, 
   query, 
@@ -22,6 +22,8 @@ import {
   getDoc,
   Timestamp
 } from 'firebase/firestore';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Info } from 'lucide-react';
 // Smart replies are disabled for now due to data structure changes
 // import { generateSmartReplies } from '@/ai/flows/smart-replies';
 
@@ -43,17 +45,26 @@ export default function ChatConversationPage() {
     if (authLoading) return; // Wait for auth to resolve
 
     if (!currentUser) {
-      router.replace(`/login?redirect=/chat/${chatId}`);
-      return;
+      if (isFirebaseConfigured) {
+        router.replace(`/login?redirect=/chat/${chatId}`);
+      }
+      // In mock mode, allow guests
     }
 
     if (!chatId) {
         setIsLoadingMessages(false);
         return;
     };
+    
+    if (!isFirebaseConfigured) {
+        setChatName(chatId.charAt(0).toUpperCase() + chatId.slice(1));
+        setIsLoadingMessages(false);
+        // In mock mode, we don't fetch messages, they are handled in-memory
+        return;
+    }
+
 
     // Fetch chat details (like name) if needed - for now, simple name
-    // Example: fetch chat name from a 'chats' collection document
     const fetchChatDetails = async () => {
       const chatDocRef = doc(db, 'chats', chatId);
       const chatDocSnap = await getDoc(chatDocRef);
@@ -114,6 +125,20 @@ export default function ChatConversationPage() {
   const handleSendMessage = async (text: string) => {
     if (!currentUser || !chatId || !text.trim()) return;
 
+    if (!isFirebaseConfigured) {
+        // Handle mock message sending
+        const newMessage: AppMessage = {
+            id: `mock_${Date.now()}`,
+            chatId: chatId,
+            senderId: currentUser.uid,
+            senderName: currentUser.displayName,
+            text: text.trim(),
+            timestamp: Date.now(),
+        };
+        setMessages(prevMessages => [...prevMessages, newMessage]);
+        return;
+    }
+
     const messagesColRef = collection(db, 'chats', chatId, 'messages');
     try {
       await addDoc(messagesColRef, {
@@ -129,7 +154,7 @@ export default function ChatConversationPage() {
     }
   };
 
-  if (authLoading || (isLoadingMessages && !messages.length)) {
+  if (authLoading || (isLoadingMessages && !messages.length && isFirebaseConfigured)) {
     return (
       <div className="flex h-full flex-col p-4">
         <Skeleton className="h-16 w-full mb-4" />
@@ -143,7 +168,7 @@ export default function ChatConversationPage() {
     );
   }
   
-  if (!currentUser && !authLoading) {
+  if (!currentUser && !authLoading && isFirebaseConfigured) {
      // Should be caught by useEffect redirect, but as a safeguard
     return <div className="flex h-full items-center justify-center">Redirecting to login...</div>;
   }
@@ -152,18 +177,26 @@ export default function ChatConversationPage() {
     return <div className="flex h-full items-center justify-center">Please select a chat or create a new one.</div>;
   }
   
-  // participants and isGroup props are simplified for now for ChatHeader
-  // A real app would fetch actual participants for the chat room.
   const mockParticipantsForHeader: AppUser[] = currentUser ? [currentUser] : []; 
-  const isGroupChat = chatId.toLowerCase() === 'general'; // Example, adapt as needed
+  const isGroupChat = chatId.toLowerCase() === 'general';
 
   return (
     <div className="flex h-full max-h-[calc(100vh-theme(spacing.16))] flex-col bg-background">
+      {!isFirebaseConfigured && (
+        <Alert className="m-4 rounded-lg border-amber-500 bg-amber-50 text-amber-900 dark:bg-amber-900/20 dark:text-amber-300">
+            <Info className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            <AlertTitle className="font-semibold">Offline / Mock Mode</AlertTitle>
+            <AlertDescription>
+              The app is running in a mock mode. To enable real-time chat with a persistent backend, please configure your Firebase credentials in 
+              <code className="mx-1 rounded bg-amber-200/50 px-1 py-0.5 text-xs dark:bg-amber-800/50">src/lib/firebase.ts</code>.
+            </AlertDescription>
+        </Alert>
+      )}
       <ChatHeader 
         chatId={chatId} 
         name={chatName} 
         avatarUrl={isGroupChat ? `https://placehold.co/100x100.png?text=${chatName?.substring(0,1)}` : currentUser?.photoURL}
-        status={isGroupChat ? 'group' : 'online'} // Simplified status
+        status={isGroupChat ? 'group' : 'online'}
         participants={mockParticipantsForHeader} 
         isGroup={isGroupChat}
       />
@@ -172,14 +205,14 @@ export default function ChatConversationPage() {
           {messages.map((msg) => (
             <ChatMessageItem key={msg.id} message={msg} currentUser={currentUser!} />
           ))}
-          {isLoadingMessages && messages.length > 0 && ( // Show loading indicator if appending new messages
+          {isLoadingMessages && messages.length > 0 && (
              <div className="flex justify-center py-2"><Skeleton className="h-8 w-24 rounded-lg" /></div>
           )}
         </div>
       </ScrollArea>
       <ChatInput 
         onSendMessage={handleSendMessage} 
-        smartReplies={[]} // Smart replies disabled
+        smartReplies={[]}
         isLoadingSmartReplies={false}
       />
     </div>

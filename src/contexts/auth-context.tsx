@@ -11,7 +11,7 @@ import {
   updateProfile
 } from 'firebase/auth';
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { auth, db, app as firebaseApp } from '@/lib/firebase'; // Firebase app instance, import app
+import { auth, db, app as firebaseApp, isFirebaseConfigured } from '@/lib/firebase'; // Firebase app instance, import app
 import type { User as AppUser } from '@/lib/types'; // Your app's User type
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 
@@ -41,8 +41,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!isFirebaseConfigured) {
+        console.warn("Firebase is not configured. Running in mock mode.");
+        const mockUserJson = localStorage.getItem('mockUser');
+        if (mockUserJson) {
+            setUser(JSON.parse(mockUserJson));
+        }
+        setLoading(false);
+        return;
+    }
+
     // Proactive check for placeholder API key
-    // Ensure firebaseApp and firebaseApp.options are available
     if (firebaseApp && firebaseApp.options && firebaseApp.options.apiKey === "YOUR_API_KEY") {
       console.error(
         "***********************************************************************************\n" +
@@ -78,31 +87,66 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (email: string, pass: string) => {
+    if (!isFirebaseConfigured) {
+        // Mock login
+        setLoading(true);
+        // In a real mock, you'd check against a mock user store. Here we just create a user.
+        const mockUser = {
+            uid: `mock_${email}`,
+            email: email,
+            displayName: email.split('@')[0],
+            photoURL: `https://placehold.co/100x100.png?text=${email.substring(0,1).toUpperCase()}`,
+        };
+        localStorage.setItem('mockUser', JSON.stringify(mockUser));
+        setUser(mockUser);
+        setLoading(false);
+        return;
+    }
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, pass);
     } catch (error) {
       console.error("Login error:", error);
       setLoading(false);
-      // The error object from Firebase often has a 'code' property.
-      // We can rethrow the original error or a more specific one.
-      throw error; // Re-throw the original Firebase error to be handled by the calling page
+      throw error; 
     }
   };
 
   const logout = async () => {
+    if (!isFirebaseConfigured) {
+        // Mock logout
+        setLoading(true);
+        localStorage.removeItem('mockUser');
+        setUser(null);
+        setLoading(false);
+        return;
+    }
     setLoading(true);
     try {
       await firebaseSignOut(auth);
     } catch (error) {
       console.error("Logout error: ", error);
+    } finally {
       setUser(null); 
       setLoading(false);
-      throw error;
     }
   };
 
   const signup = async (name: string, email: string, pass: string) => {
+     if (!isFirebaseConfigured) {
+        // Mock signup
+        setLoading(true);
+        const mockUser = {
+            uid: `mock_${email}`,
+            email: email,
+            displayName: name,
+            photoURL: `https://placehold.co/100x100.png?text=${name.substring(0,1).toUpperCase()}`,
+        };
+        localStorage.setItem('mockUser', JSON.stringify(mockUser));
+        setUser(mockUser);
+        setLoading(false);
+        return;
+    }
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
@@ -121,7 +165,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error("Signup error:", error);
       setLoading(false);
-      throw error; // Re-throw the original Firebase error
+      throw error;
     }
   };
 
