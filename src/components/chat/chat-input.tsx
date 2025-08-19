@@ -23,6 +23,57 @@ interface ChatInputProps {
 
 const emojis = ["😀", "😂", "😍", "🤔", "👍", "🎉", "❤️", "🙏"];
 
+// Helper function to resize images before upload
+const compressImage = (file: File, maxWidth: number = 1280): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
+    const isImage = file.type.startsWith('image/');
+    if (!isImage) {
+      resolve(file); // Not an image, return original file
+      return;
+    }
+
+    const img = document.createElement('img');
+    const canvas = document.createElement('canvas');
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      if (typeof e.target?.result === 'string') {
+        img.src = e.target.result;
+      }
+    };
+
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxWidth) {
+        height = (maxWidth / width) * height;
+        width = maxWidth;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Could not get canvas context'));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      // Get blob from canvas
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(blob);
+        } else {
+          reject(new Error('Canvas to Blob conversion failed'));
+        }
+      }, file.type, 0.9); // 0.9 is image quality
+    };
+
+    img.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
+
+
 export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -61,7 +112,7 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       if (!storage) {
@@ -72,43 +123,56 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
         });
         return;
       }
+
       setUploadingFile(file);
       setUploadProgress(0);
 
-      const storageRef = ref(storage, `chat-attachments/${chatId}/${Date.now()}_${file.name}`);
-      const uploadTask = uploadBytesResumable(storageRef, file);
+      try {
+        const fileToUpload = await compressImage(file);
+        const storageRef = ref(storage, `chat-attachments/${chatId}/${Date.now()}_${file.name}`);
+        const uploadTask = uploadBytesResumable(storageRef, fileToUpload);
 
-      uploadTask.on('state_changed',
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setUploadProgress(progress);
-        },
-        (error) => {
-          console.error("Upload failed:", error);
-          toast({
-            title: "Upload Failed",
-            description: "Your file could not be uploaded. Please try again.",
-            variant: "destructive"
-          });
-          setUploadingFile(null);
-        },
-        () => {
-          getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-            onSendMessage({
-              attachmentUrl: downloadURL,
-              attachmentType: file.type,
-              attachmentName: file.name,
-              text: message // Send any typed text along with the file
-            });
+        uploadTask.on('state_changed',
+          (snapshot) => {
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            setUploadProgress(progress);
+          },
+          (error) => {
+            console.error("Upload failed:", error);
             toast({
-              title: "File Sent!",
-              description: `${file.name} has been sent.`,
+              title: "Upload Failed",
+              description: "Your file could not be uploaded. Please try again.",
+              variant: "destructive"
             });
-            setMessage(""); // Clear message input after sending attachment
             setUploadingFile(null);
-          });
-        }
-      );
+          },
+          () => {
+            getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+              onSendMessage({
+                attachmentUrl: downloadURL,
+                attachmentType: file.type,
+                attachmentName: file.name,
+                text: message // Send any typed text along with the file
+              });
+              toast({
+                title: "File Sent!",
+                description: `${file.name} has been sent.`,
+              });
+              setMessage(""); // Clear message input after sending attachment
+              setUploadingFile(null);
+            });
+          }
+        );
+      } catch (error) {
+        console.error("Image compression or upload failed", error);
+        toast({
+            title: "Upload Failed",
+            description: "There was an error processing your file.",
+            variant: "destructive"
+        });
+        setUploadingFile(null);
+      }
+
 
       if (fileInputRef.current) {
         fileInputRef.current.value = ""; // Reset file input
@@ -199,7 +263,7 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
                     <File className="h-5 w-5 shrink-0" />
                     <div className="text-sm truncate">
                         <p className="font-medium truncate">{uploadingFile.name}</p>
-                        <p className="text-xs text-muted-foreground">Uploading... {Math.round(uploadProgress)}%</p>
+                        <p className="text-xs text-muted-foreground">{uploadingFile.type.startsWith('image/') ? "Compressing & uploading..." : "Uploading..."} {Math.round(uploadProgress)}%</p>
                     </div>
                 </div>
                 <Button variant="ghost" size="icon" className="shrink-0" onClick={handleCancelUpload}>
@@ -305,3 +369,5 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
     </div>
   );
 }
+
+    
