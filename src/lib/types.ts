@@ -40,8 +40,7 @@ export interface Story {
     userPhotoURL: string | null;
     mediaUrl: string;
     mediaType: string; // e.g., 'image/jpeg'
-    timestamp: number; // Firestore serverTimestamp
-    expiresAt: number;
+    timestamp: number; // Firestore serverTimestamp as a number (milliseconds)
 }
 
 

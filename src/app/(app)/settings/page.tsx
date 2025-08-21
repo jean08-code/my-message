@@ -35,13 +35,17 @@ export default function SettingsPage() {
       router.replace('/login?redirect=/settings'); // Redirect to login if not authenticated
     }
     if (user) {
-      setName(user.name);
+      setName(user.name || '');
       setEmail(user.email || '');
       setAvatarUrl(user.avatarUrl || '');
     }
     const storedSettings = localStorage.getItem('rippleChatNotificationSettings');
-    if (storedSettings) {
-      setNotificationSettings(JSON.parse(storedSettings));
+    if (storedSettings && storedSettings !== 'undefined') {
+      try {
+        setNotificationSettings(JSON.parse(storedSettings));
+      } catch (error) {
+        console.error("Failed to parse notification settings:", error);
+      }
     }
   }, [user, authLoading, router]);
 

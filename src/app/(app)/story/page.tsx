@@ -42,9 +42,11 @@ export default function StoryPage() {
     }
 
     const now = new Date();
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const storiesColRef = collection(db, 'stories');
-    // Query for stories that have not expired yet
-    const q = query(storiesColRef, where('expiresAt', '>', now.getTime()), orderBy('expiresAt', 'desc'));
+    
+    // Query for stories created in the last 24 hours
+    const q = query(storiesColRef, where('timestamp', '>', Timestamp.fromDate(twentyFourHoursAgo)), orderBy('timestamp', 'desc'));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedStories: Story[] = [];
@@ -52,7 +54,8 @@ export default function StoryPage() {
         const data = doc.data();
         fetchedStories.push({
           id: doc.id,
-          ...data
+          ...data,
+          timestamp: (data.timestamp as Timestamp)?.toMillis() || Date.now()
         } as Story);
       });
 
@@ -69,6 +72,8 @@ export default function StoryPage() {
           acc.push(group);
         }
         group.stories.push(story);
+        // Sort stories within the group by timestamp
+        group.stories.sort((a, b) => a.timestamp - b.timestamp);
         return acc;
       }, [] as GroupedStory[]);
       
@@ -110,8 +115,6 @@ export default function StoryPage() {
       async () => {
         const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
         
-        const twentyFourHoursFromNow = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
         await addDoc(collection(db, 'stories'), {
           userId: user.uid,
           userDisplayName: user.displayName,
@@ -119,7 +122,6 @@ export default function StoryPage() {
           mediaUrl: downloadURL,
           mediaType: file.type,
           timestamp: serverTimestamp(),
-          expiresAt: twentyFourHoursFromNow.getTime()
         });
 
         toast({ title: "Story Uploaded!", description: "Your story is now live for 24 hours." });
@@ -139,25 +141,31 @@ export default function StoryPage() {
 
   const goToNextStory = () => {
     if (selectedStoryGroup) {
-      setCurrentStoryIndex(prev => (prev + 1) % selectedStoryGroup.stories.length);
+        if (currentStoryIndex < selectedStoryGroup.stories.length - 1) {
+            setCurrentStoryIndex(prev => prev + 1);
+        } else {
+            closeStoryViewer(); // Close if it's the last story
+        }
     }
   }
 
   const goToPreviousStory = () => {
      if (selectedStoryGroup) {
-      setCurrentStoryIndex(prev => (prev - 1 + selectedStoryGroup.stories.length) % selectedStoryGroup.stories.length);
+      if (currentStoryIndex > 0) {
+        setCurrentStoryIndex(prev => prev - 1);
+      }
     }
   }
 
-  const myStory = stories.find(s => s.userId === user?.uid);
-  const otherStories = stories.filter(s => s.userId !== user?.uid);
+  const myStoryGroup = stories.find(s => s.userId === user?.uid);
+  const otherStoryGroups = stories.filter(s => s.userId !== user?.uid);
 
 
   return (
     <>
-    <div className="container mx-auto max-w-4xl py-8 px-4">
+    <div className="container mx-auto max-w-4xl py-6 px-4 md:py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Stories</h1>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Stories</h1>
         <Button asChild>
            <label htmlFor="story-upload" className="cursor-pointer">
               <PlusCircle className="mr-2 h-4 w-4" />
@@ -179,15 +187,15 @@ export default function StoryPage() {
         </Card>
       )}
 
-      {myStory && (
+      {myStoryGroup && (
         <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-4">Your Story</h2>
-            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-4">
-                 <div onClick={() => openStoryViewer(myStory)} className="flex flex-col items-center gap-2 cursor-pointer">
+            <h2 className="text-lg md:text-xl font-semibold mb-4">Your Story</h2>
+            <div className="flex flex-wrap gap-4">
+                 <div onClick={() => openStoryViewer(myStoryGroup)} className="flex flex-col items-center gap-2 cursor-pointer transform hover:scale-105 transition-transform duration-200">
                     <div className="rounded-full p-1 bg-gradient-to-tr from-yellow-400 to-pink-500">
                         <Avatar className="w-16 h-16 border-2 border-background">
-                            <AvatarImage src={myStory.userPhotoURL ?? undefined} alt={myStory.userDisplayName || 'User'} data-ai-hint="user avatar story"/>
-                            <AvatarFallback>{myStory.userDisplayName?.substring(0,1) || 'U'}</AvatarFallback>
+                            <AvatarImage src={myStoryGroup.userPhotoURL ?? undefined} alt={myStoryGroup.userDisplayName || 'User'} data-ai-hint="user avatar story"/>
+                            <AvatarFallback>{myStoryGroup.userDisplayName?.substring(0,1) || 'U'}</AvatarFallback>
                         </Avatar>
                     </div>
                     <p className="text-xs font-medium truncate">Your Story</p>
@@ -197,15 +205,15 @@ export default function StoryPage() {
       )}
 
       <div>
-        <h2 className="text-xl font-semibold mb-4">Recent Stories</h2>
+        <h2 className="text-lg md:text-xl font-semibold mb-4">Recent Stories</h2>
         {isLoadingStories ? (
             <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-4">
-                {Array.from({length: 4}).map((_, i) => <Skeleton key={i} className="w-16 h-20 rounded-lg"/>)}
+                {Array.from({length: 4}).map((_, i) => <Skeleton key={i} className="w-16 h-24 rounded-lg"/>)}
             </div>
-        ) : otherStories.length > 0 ? (
+        ) : otherStoryGroups.length > 0 ? (
           <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-4">
-            {otherStories.map((group) => (
-              <div key={group.userId} onClick={() => openStoryViewer(group)} className="flex flex-col items-center gap-2 cursor-pointer">
+            {otherStoryGroups.map((group) => (
+              <div key={group.userId} onClick={() => openStoryViewer(group)} className="flex flex-col items-center gap-2 cursor-pointer transform hover:scale-105 transition-transform duration-200">
                 <div className="rounded-full p-1 bg-gradient-to-tr from-yellow-400 to-pink-500">
                     <Avatar className="w-16 h-16 border-2 border-background">
                         <AvatarImage src={group.userPhotoURL ?? undefined} alt={group.userDisplayName || 'User'} data-ai-hint="user avatar story"/>
@@ -227,44 +235,46 @@ export default function StoryPage() {
     </div>
     
     <Dialog open={!!selectedStoryGroup} onOpenChange={(isOpen) => !isOpen && closeStoryViewer()}>
-        <DialogContent className="p-0 max-w-md h-[80vh] bg-black border-0 flex flex-col items-center justify-center">
+        <DialogContent className="p-0 max-w-md w-full h-[90vh] sm:h-[80vh] bg-black border-0 flex flex-col items-center justify-center rounded-lg overflow-hidden">
              {selectedStoryGroup && (
                 <>
-                <DialogHeader className="absolute top-0 left-0 w-full p-4 z-10 bg-gradient-to-b from-black/60 to-transparent">
-                    <div className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8 border">
-                             <AvatarImage src={selectedStoryGroup.userPhotoURL ?? undefined} alt={selectedStoryGroup.userDisplayName || 'User'}/>
-                             <AvatarFallback>{selectedStoryGroup.userDisplayName?.substring(0,1) || 'U'}</AvatarFallback>
-                        </Avatar>
-                        <DialogTitle className="text-white text-sm">{selectedStoryGroup.userDisplayName}</DialogTitle>
-                    </div>
-                </DialogHeader>
-                 <div className="absolute top-2 w-[calc(100%-1rem)] px-2 flex gap-1 z-10">
+                <div className="absolute top-2 w-[calc(100%-1rem)] px-2 flex gap-1 z-20">
                     {selectedStoryGroup.stories.map((_, index) => (
-                        <div key={index} className="h-1 flex-1 rounded-full bg-white/30">
-                            <div
-                                className="h-1 rounded-full bg-white"
-                                style={{ width: `${index === currentStoryIndex ? '100' : '0'}%` }}
-                            />
+                        <div key={index} className="h-1 flex-1 rounded-full bg-white/30 overflow-hidden">
+                           <div
+                                className="h-1 rounded-full bg-white transition-all duration-300 ease-linear"
+                                style={{ width: index === currentStoryIndex ? '100%' : (index < currentStoryIndex ? '100%' : '0%') }}
+                           />
                         </div>
                     ))}
                 </div>
+                <DialogHeader className="absolute top-4 left-0 w-full p-4 z-20 bg-gradient-to-b from-black/60 to-transparent">
+                    <div className="flex items-center gap-3">
+                        <Avatar className="h-9 w-9 border">
+                             <AvatarImage src={selectedStoryGroup.userPhotoURL ?? undefined} alt={selectedStoryGroup.userDisplayName || 'User'}/>
+                             <AvatarFallback>{selectedStoryGroup.userDisplayName?.substring(0,1) || 'U'}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                            <DialogTitle className="text-white text-sm font-semibold">{selectedStoryGroup.userDisplayName}</DialogTitle>
+                             <p className="text-xs text-neutral-300">{new Date(selectedStoryGroup.stories[currentStoryIndex].timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                        </div>
+                    </div>
+                </DialogHeader>
                 <div className="relative w-full h-full">
                   <Image 
                       src={selectedStoryGroup.stories[currentStoryIndex].mediaUrl}
                       alt="Story"
                       layout="fill"
                       objectFit="contain"
-                      className="rounded-lg"
                   />
                 </div>
-                 <div className="absolute inset-0 flex justify-between items-center">
+                 <div className="absolute inset-0 flex justify-between items-center z-10">
                     <button onClick={goToPreviousStory} className="h-full w-1/3" aria-label="Previous Story" />
-                    <button onClick={goToNextStory} className="h-full w-1/3" aria-label="Next Story" />
+                    <button onClick={goToNextStory} className="h-full w-2/3" aria-label="Next Story" />
                 </div>
-                <DialogClose className="absolute top-4 right-4 z-20">
-                     <X className="w-6 h-6 text-white"/>
-                </DialogClose>
+                <DialogClose className="absolute top-4 right-4 z-20 text-white rounded-full bg-black/30 hover:bg-black/50 p-1 transition-colors">
+                     <X className="w-5 h-5"/>
+                </Dialog-Close>
                 </>
              )}
         </DialogContent>
