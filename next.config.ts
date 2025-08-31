@@ -30,6 +30,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  transpilePackages: ['@radix-ui/react-dialog'],
 };
 
 export default nextConfig;
