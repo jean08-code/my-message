@@ -120,8 +120,8 @@ export function ChatHeader({ name, avatarUrl, status, participants, isGroup }: C
 
   return (
     <>
-      <div className="flex items-center justify-between border-b p-3.5 bg-card shadow-sm">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between border-b p-2 md:p-3.5 bg-card shadow-sm">
+        <div className="flex items-center gap-2 md:gap-3">
           <Link href="/chat" className="md:hidden">
             <Button variant="ghost" size="icon" aria-label="Back to chat list">
               <ArrowLeft className="h-5 w-5" />
@@ -135,13 +135,13 @@ export function ChatHeader({ name, avatarUrl, status, participants, isGroup }: C
             {/* PresenceIndicator removed for simplicity */}
           </div>
           <div>
-            <h2 className="text-base font-semibold text-foreground">{name}</h2>
+            <h2 className="text-base font-semibold text-foreground truncate max-w-40 md:max-w-full">{name}</h2>
             <p className="text-xs text-muted-foreground">
               {isGroup ? `${participantCount} members` : status /* Simplified status display */}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 md:gap-2">
           <Button variant="ghost" size="icon" aria-label="Call" onClick={handleAudioCallClick}>
             <Phone className="h-5 w-5" />
           </Button>

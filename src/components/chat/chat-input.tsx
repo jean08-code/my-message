@@ -271,7 +271,7 @@ export function ChatInput({ onSendMessage, smartReplies, isLoadingSmartReplies }
     }, []);
 
   return (
-    <div className="border-t bg-card p-3 md:p-4 space-y-2">
+    <div className="border-t bg-card p-2 md:p-4 space-y-2">
       {showMicPermissionAlert && micPermission === 'denied' && (
         <Alert variant="destructive" className="mb-2">
           <AlertTriangle className="h-4 w-4" />

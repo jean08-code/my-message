@@ -35,17 +35,17 @@ export default function SettingsPage() {
       router.replace('/login?redirect=/settings'); // Redirect to login if not authenticated
     }
     if (user) {
-      setName(user.name || '');
+      setName(user.displayName || '');
       setEmail(user.email || '');
-      setAvatarUrl(user.avatarUrl || '');
+      setAvatarUrl(user.photoURL || '');
     }
-    const storedSettings = localStorage.getItem('rippleChatNotificationSettings');
-    if (storedSettings && storedSettings !== 'undefined') {
-      try {
+    try {
+      const storedSettings = localStorage.getItem('rippleChatNotificationSettings');
+      if (storedSettings) {
         setNotificationSettings(JSON.parse(storedSettings));
-      } catch (error) {
-        console.error("Failed to parse notification settings:", error);
       }
+    } catch (error) {
+      console.error("Failed to parse notification settings:", error);
     }
   }, [user, authLoading, router]);
 
@@ -55,7 +55,7 @@ export default function SettingsPage() {
     try {
       // This is a mock update. In a real app, use a dedicated update function.
       // For now, re-using signup updates the user in context.
-      const updatedUser = { ...user, name, avatarUrl }; 
+      const updatedUser = { ...user, displayName: name, photoURL: avatarUrl }; 
       localStorage.setItem('rippleChatUser', JSON.stringify(updatedUser)); // Mock update
       // Call a function to update user context if signup doesn't do it well enough
       // For mock, this might be enough, or use a toast to indicate manual refresh if needed
@@ -74,13 +74,13 @@ export default function SettingsPage() {
   };
 
   if (authLoading) {
-    return <div className="p-6">Loading settings...</div>;
+    return <div className="p-4 md:p-6">Loading settings...</div>;
   }
 
   if (!user) {
     // This state should ideally be handled by the redirect, but as a fallback:
     return (
-      <div className="container mx-auto max-w-3xl py-8 px-4">
+      <div className="container mx-auto max-w-4xl py-6 px-4">
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Access Denied</AlertTitle>
@@ -90,14 +90,14 @@ export default function SettingsPage() {
     );
   }
 
-  const fallbackName = user.name ? user.name.substring(0, 2).toUpperCase() : "U";
+  const fallbackName = user.displayName ? user.displayName.substring(0, 2).toUpperCase() : "U";
 
   return (
-    <div className="container mx-auto max-w-3xl py-8 px-4 space-y-8">
-      <h1 className="text-3xl font-bold tracking-tight text-foreground">Settings</h1>
+    <div className="container mx-auto max-w-4xl py-6 px-4 space-y-8">
+      <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Settings</h1>
 
       <Card>
-        <CardHeader className="flex flex-row items-center gap-3">
+        <CardHeader className="flex flex-row items-center gap-4">
           <UserCircle2 className="h-6 w-6 text-primary" />
           <div>
             <CardTitle>Profile</CardTitle>
@@ -105,8 +105,8 @@ export default function SettingsPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex items-center gap-4">
-            <Avatar className="h-20 w-20 border-2 border-primary/30">
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <Avatar className="h-24 w-24 border-2 border-primary/30">
               <AvatarImage src={avatarUrl} alt={name} data-ai-hint="user avatar" />
               <AvatarFallback>{fallbackName}</AvatarFallback>
             </Avatar>
@@ -115,6 +115,7 @@ export default function SettingsPage() {
               value={avatarUrl} 
               onChange={(e) => setAvatarUrl(e.target.value)}
               placeholder="Avatar URL (e.g., https://placehold.co/200x200.png)"
+              className="flex-1"
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -134,7 +135,7 @@ export default function SettingsPage() {
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-center gap-3">
+        <CardHeader className="flex flex-row items-center gap-4">
           <Palette className="h-6 w-6 text-primary" />
           <div>
             <CardTitle>Appearance</CardTitle>
@@ -142,13 +143,13 @@ export default function SettingsPage() {
           </div>
         </CardHeader>
         <CardContent className="flex items-center justify-between">
-          <p>Theme</p>
+          <p className="font-medium">Theme</p>
           <ThemeToggle />
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-center gap-3">
+        <CardHeader className="flex flex-row items-center gap-4">
           <Bell className="h-6 w-6 text-primary" />
           <div>
             <CardTitle>Notifications</CardTitle>

@@ -242,7 +242,7 @@ export default function StoryPage() {
                     {selectedStoryGroup.stories.map((_, index) => (
                         <div key={index} className="h-1 flex-1 rounded-full bg-white/30 overflow-hidden">
                            <div
-                                className="h-1 rounded-full bg-white transition-all duration-300 ease-linear"
+                                className="h-1 rounded-full bg-white transition-all"
                                 style={{ width: index === currentStoryIndex ? '100%' : (index < currentStoryIndex ? '100%' : '0%') }}
                            />
                         </div>
@@ -264,7 +264,7 @@ export default function StoryPage() {
                   <Image 
                       src={selectedStoryGroup.stories[currentStoryIndex].mediaUrl}
                       alt="Story"
-                      layout="fill"
+                      fill
                       objectFit="contain"
                   />
                 </div>
@@ -272,9 +272,11 @@ export default function StoryPage() {
                     <button onClick={goToPreviousStory} className="h-full w-1/3" aria-label="Previous Story" />
                     <button onClick={goToNextStory} className="h-full w-2/3" aria-label="Next Story" />
                 </div>
-                <DialogClose className="absolute top-4 right-4 z-20 text-white rounded-full bg-black/30 hover:bg-black/50 p-1 transition-colors">
+                <DialogClose asChild>
+                  <Button variant="ghost" size="icon" className="absolute top-4 right-4 z-20 text-white rounded-full bg-black/30 hover:bg-black/50 p-1 transition-colors">
                      <X className="w-5 h-5"/>
-                </Dialog-Close>
+                  </Button>
+                </DialogClose>
                 </>
              )}
         </DialogContent>

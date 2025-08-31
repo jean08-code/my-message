@@ -180,7 +180,7 @@ export default function ChatConversationPage() {
 
   if (authLoading || (isLoadingMessages && !messages.length && isFirebaseConfigured)) {
     return (
-      <div className="flex h-full flex-col p-4">
+      <div className="flex h-full flex-col p-2 md:p-4">
         <Skeleton className="h-16 w-full mb-4" />
         <div className="flex-1 space-y-4">
           <Skeleton className="h-12 w-3/4 self-start rounded-lg" />
@@ -198,7 +198,7 @@ export default function ChatConversationPage() {
   }
 
   if (!chatId) {
-    return <div className="flex h-full items-center justify-center">Please select a chat or create a new one.</div>;
+    return <div className="flex h-full items-center justify-center p-4 text-center">Please select a chat to start a conversation.</div>;
   }
   
   const mockParticipantsForHeader: AppUser[] = currentUser ? [currentUser] : []; 
@@ -207,7 +207,7 @@ export default function ChatConversationPage() {
   return (
     <div className="flex h-full max-h-[calc(100vh-theme(spacing.16))] flex-col bg-background">
       {!isFirebaseConfigured && (
-        <Alert className="m-4 rounded-lg border-amber-500 bg-amber-50 text-amber-900 dark:bg-amber-900/20 dark:text-amber-300">
+        <Alert className="m-2 md:m-4 rounded-lg border-amber-500 bg-amber-50 text-amber-900 dark:bg-amber-900/20 dark:text-amber-300">
             <Info className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             <AlertTitle className="font-semibold">Offline / Mock Mode</AlertTitle>
             <AlertDescription>
@@ -224,7 +224,7 @@ export default function ChatConversationPage() {
         participants={mockParticipantsForHeader} 
         isGroup={isGroupChat}
       />
-      <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+      <ScrollArea className="flex-1 p-2 md:p-4" ref={scrollAreaRef}>
         <div className="space-y-4">
           {messages.map((msg) => (
             <ChatMessageItem key={msg.id} message={msg} currentUser={currentUser!} />
