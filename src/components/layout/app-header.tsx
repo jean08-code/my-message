@@ -5,7 +5,6 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserNav } from "@/components/layout/user-nav";
 import Link from "next/link";
-import { MessageSquare } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 
 export function AppHeader() {
@@ -16,7 +15,7 @@ export function AppHeader() {
       <div className="flex items-center gap-2">
         <SidebarTrigger className="md:hidden" />
         <Link href="/chat" className="flex items-center gap-2 text-lg font-semibold text-primary">
-          <MessageSquare className="h-7 w-7" />
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-xl font-bold text-primary-foreground">R</div>
           <span className="hidden sm:inline-block">RippleChat</span>
         </Link>
       </div>

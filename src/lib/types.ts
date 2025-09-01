@@ -1,11 +1,13 @@
 
+export type UserStatus = 'online' | 'offline' | 'away' | 'dnd';
+
 // User interface, aligning more with Firebase Auth user object
 export interface User {
   uid: string; // Firebase User ID
   displayName: string | null;
   email: string | null;
   photoURL?: string | null;
-  // UserStatus (online/offline) is removed for simplicity with Firebase basic setup
+  status?: UserStatus;
 }
 
 // Message interface for Firestore

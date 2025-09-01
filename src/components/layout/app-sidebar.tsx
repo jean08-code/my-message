@@ -10,12 +10,13 @@ import {
   SidebarMenuButton,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { MessageSquare, Settings, Users, ChevronLeftSquare, GalleryHorizontal } from "lucide-react";
+import { Settings, Users, ChevronLeftSquare, GalleryHorizontal } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "../ui/button";
 import { useSidebar } from "@/components/ui/sidebar";
 import { useAuth } from "@/contexts/auth-context"; // Import useAuth
+import { MessageSquare } from "lucide-react";
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -32,7 +33,7 @@ export function AppSidebar() {
     <Sidebar side="left" variant="sidebar" collapsible="icon">
       <SidebarHeader className="p-4 justify-between items-center">
           <Link href="/chat" className="flex items-center gap-2 text-xl font-semibold text-primary group-data-[collapsible=icon]:hidden">
-            <MessageSquare className="h-7 w-7" />
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-xl font-bold text-primary-foreground">R</div>
             <span>RippleChat</span>
           </Link>
           <Button variant="ghost" size="icon" onClick={toggleSidebar} className="group-data-[collapsible=icon]:hidden">

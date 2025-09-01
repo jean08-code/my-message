@@ -6,14 +6,15 @@ import Link from "next/link";
 import { useAuth } from "@/contexts/auth-context";
 import { db, isFirebaseConfigured } from '@/lib/firebase';
 import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
-import type { User } from '@/lib/types';
+import type { User, UserStatus } from '@/lib/types';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "../ui/input";
-import { Search, User as UserIcon } from "lucide-react";
+import { Search } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
+import { PresenceIndicator } from './presence-indicator';
 
 export function ChatList() {
   const { user: currentUser } = useAuth();
@@ -25,14 +26,22 @@ export function ChatList() {
   useEffect(() => {
     if (!isFirebaseConfigured) {
       setLoading(false);
-      // In mock mode, we can add some mock users if needed for UI testing
-      // For now, it will just be empty as we focus on Firebase.
+      setUsers([{
+          uid: 'mock_user_1',
+          displayName: 'Jane Doe',
+          email: 'jane@example.com',
+          status: 'online'
+      }, {
+          uid: 'mock_user_2',
+          displayName: 'John Smith',
+          email: 'john@example.com',
+          status: 'offline'
+      }]);
       return;
     }
     
     if (!currentUser) {
         setLoading(false);
-        // If no user is logged in, don't fetch the user list
         return;
     }
 
@@ -42,7 +51,6 @@ export function ChatList() {
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const fetchedUsers: User[] = [];
       querySnapshot.forEach((doc) => {
-        // We only want to list OTHER users, not the current user
         if (doc.id !== currentUser.uid) {
            fetchedUsers.push({
             uid: doc.id,
@@ -64,10 +72,8 @@ export function ChatList() {
     user.displayName?.toLowerCase().includes(searchTerm.toLowerCase())
   );
   
-  // Helper to create a consistent chat ID for 1-on-1 chats
   const createChatId = (otherUserUid: string) => {
     if (!currentUser) return '';
-    // Sort UIDs to ensure the ID is the same regardless of who starts the chat
     return [currentUser.uid, otherUserUid].sort().join('_');
   };
 
@@ -82,7 +88,6 @@ export function ChatList() {
             className="pl-8"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            disabled={!isFirebaseConfigured}
           />
         </div>
       </div>
@@ -110,13 +115,16 @@ export function ChatList() {
                                 "flex items-center gap-3 rounded-md p-2 text-sm font-medium transition-colors hover:bg-muted",
                                 pathname === `/chat/${chatId}` ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'
                             )}>
-                                <Avatar className="h-9 w-9 border">
-                                    <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'User'} data-ai-hint="user avatar" />
-                                    <AvatarFallback>{fallback}</AvatarFallback>
-                                </Avatar>
+                                <div className="relative">
+                                    <Avatar className="h-9 w-9 border">
+                                        <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'User'} data-ai-hint="user avatar" />
+                                        <AvatarFallback>{fallback}</AvatarFallback>
+                                    </Avatar>
+                                    <PresenceIndicator status={user.status || 'offline'} className="absolute bottom-0 right-0" />
+                                </div>
                                 <div className="flex-1 truncate">
                                     <p className="font-semibold">{user.displayName}</p>
-                                    <p className="text-xs">Direct Message</p>
+                                    <p className="text-xs capitalize">{user.status || 'Offline'}</p>
                                 </div>
                             </a>
                         </Link>
